@@ -1,0 +1,1418 @@
+---
+title: "Chapter 4"
+output: html_notebook
+---
+# Readme
+
+This code is the combination of working chunks that were used for the completion of my phd thesis. This document should contain the necessary information to reproduce the plotting and analysis in the methods section but it is not a stand alone reproducible document. It is advised that the specific area of interest be isolated from the .Rmd file and those chunks be run accordingly.
+
+```{r}
+library(tidyverse)
+library(workflowr)
+library(GGally)
+library(superheat)
+library(viridis)
+library(factoextra)
+library(ggalt)
+library(ggfortify)
+#library(ggbiplot)
+library(ggpubr)
+library(RColorBrewer)
+library(vegan)
+library(gplots)
+library(ggeffects)
+library(Rmisc)
+library(gridExtra)
+library(FSA)
+library(rcompanion)
+library(PMCMR)
+library(table1)
+library(tidyr)
+library(broom)
+library(officer)
+library(reshape2)
+library(magrittr)
+library(dplyr)
+library(car)
+library(FactoMineR)
+library(indicspecies)
+library(workflowr)
+
+```
+
+# Colours
+
+```{r}
+morgz_colours<-c("#d900e7", "#09be4e", "#09bea8", "#0979be", "#091ebe", "#020202")
+```
+
+## Growth
+```{r sp, include=FALSE}
+# Get the new file into the environment 
+sp1 <- read_rds("data/sp1.rds")
+
+```
+### Length vs Weight regression
+```{r}
+sp.scatterplot <- ggscatter(sp1, x = "weight", y = "length", alpha = 0.1,
+                add = "loess",              # Add regression line
+                conf.int = TRUE,                # Add confidence interval
+                facet.by = "treatment",
+                nrow = 1,
+                ylim = c(40, 80),
+                xlim = c(0, 80),
+              #  main = "A",
+                legend = "none",
+                color = "treatment", palette = c("#d900e7", "#09be4e", "#09bea8", "#0979be", "#091ebe", "#020202"))
+```
+## Dissections
+```{r}
+# Get the new file into the environment 
+dissec <- 
+  sp1 %>% 
+  filter(diss == "Y")
+```
+
+```{r}
+ggscatter(dissec, x = "weight", y = "length", alpha = 0.1,
+                add = "loess",              # Add regression line
+                conf.int = TRUE,                # Add confidence interval
+                facet.by = "treatment",
+                nrow = 1,
+                ylim = c(40, 80),
+                xlim = c(0, 80),
+              #  main = "A",
+                legend = "none",
+                color = "treatment", palette = c("#d900e7", "#09be4e", "#09bea8", "#0979be", "#091ebe", "#020202"))
+```
+
+## DDGE Band matching
+
+```{r}
+# Get the new file into the environment 
+dg <- read_rds("/Users/morganbrand/Desktop/PhD/r/data/rdata/dg.rds")
+
+```
+
+## FCR data loading
+```{r}
+# Get the new file into the environment 
+aa <- read_rds("/Users/morganbrand/Desktop/PhD/r/data/rdata/aa.rds")
+```
+
+# Physiological data
+
+In this section I am going to attempt to join the growth and physiological data from each animal at time 2 with the quantitatvie band matching table exported from gel compare. I will then investigate the approximate number of groups and plot on.
+
+Things to do
+
+  1) Calculate SGR
+  2) Calculate MISL
+  3) Join 
+  
+## From dissec
+The data are all data obtained in diseesction and not the SGR or MISL calculations
+It would be interesting to include compute the SGR and MISL in this format but I have not yet figured it out.
+
+### Tidy
+```{r}
+# renaming the variables from dissec
+dissec.ggpub <- dissec
+
+revalue(dissec.ggpub$time, c("0" = "0")) -> dissec.ggpub$time
+revalue(dissec.ggpub$time, c("1" = "105")) -> dissec.ggpub$time
+revalue(dissec.ggpub$time, c("2" = "215")) -> dissec.ggpub$time
+revalue(dissec.ggpub$treatment, c("1" = "AB")) -> dissec.ggpub$treatment
+revalue(dissec.ggpub$treatment, c("2" = "ABFU")) -> dissec.ggpub$treatment
+revalue(dissec.ggpub$treatment, c("3" = "AB10U")) -> dissec.ggpub$treatment
+revalue(dissec.ggpub$treatment, c("4" = "AB1U")) -> dissec.ggpub$treatment
+revalue(dissec.ggpub$treatment, c("5" = "AB0.1U")) ->dissec.ggpub$treatment
+revalue(dissec.ggpub$treatment, c("6" = "FU")) -> dissec.ggpub$treatment
+```
+### Seperate data
+```{r}
+d.shell <- dissec.ggpub %>%
+  select(time, replicate, treatment, id, shell) %>%
+  na.omit()
+d.shell.se<-summarySE(d.shell, measurevar="shell", groupvars=c("time","treatment"), na.rm = TRUE)
+
+#### Muscle moisture
+d.moist <- dissec.ggpub %>%
+  select(time, replicate, treatment, id, moisture) %>%
+  na.omit()
+d.moist.se<-summarySE(d.moist, measurevar="moisture", groupvars=c("time","treatment"), na.rm = TRUE)
+
+#### Muscle glycogen
+d.gly <- dissec.ggpub %>%
+  select(time, replicate, treatment, id, glycogen) %>%
+  na.omit()
+d.glyl.se<-summarySE(d.gly, measurevar="glycogen", groupvars=c("time","treatment"), na.rm = TRUE)
+
+#### Meat mass index
+#d.mmi <- dissec.ggpub %>%
+#  select(time, replicate, treatment, id, mmi) %>%
+#  na.omit()
+#d.mmi.se<-summarySE(d.mmi, measurevar="mmi", groupvars=c("time","treatment"), na.rm = TRUE)
+
+###@ pH
+#d.ph <- dissec.ggpub %>%
+#  select(time, replicate, treatment, id, ph) %>%
+#  na.omit()
+#d.ph.se<-summarySE(d.ph, measurevar="ph", groupvars=c("time","treatment"), na.rm = TRUE)
+```
+
+# Relative shell 
+## Final plot
+```{r}
+#d.shell.se<-summarySE(d.shell, measurevar="shell", groupvars=c("time", "treatment", "replicate"), na.rm = TRUE)
+ggpub.d.shell <- d.shell %>%
+  ggline(x = "time", y = "shell", group = "treatment",
+         ggtheme = theme_pubr(),
+         color = "treatment", add = "mean_se",
+         facet.by = "treatment",
+         nrow = "1", 
+         ylim = c(25, 35),
+         legend = "none",
+       #  main = "A",
+         x.text.angle = 90,
+         xlab = "Days",
+         ylab = "Relative Shell Weight (%)",
+         palette = c("#d900e7", "#09be4e", "#09bea8", "#0979be", "#091ebe", "#020202")) +
+         stat_compare_means(method = "t.test", 
+                            label = "p.signif", 
+                            label.y = 90,
+                            hide.ns = TRUE) + 
+  grids(linetype = "dotted") +
+  geom_hline(yintercept = 28.83049, linetype = 2) 
+ggpub.d.shell
+```
+## Statistics
+### All data average
+```{r}
+# Summary by treatent
+shell_treatment <- summarySE(d.shell, measurevar="shell", groupvars=c("treatment"), na.rm = TRUE)
+
+# fitting
+a.shell.all <- aov(shell ~ treatment, data = d.shell)
+# tests
+library(car)
+## Residuals
+par(mfrow=c(2,2))
+plot(a.shell.all)
+r.shell.all<-resid(a.shell.all)
+shapiro.test(r.shell.all)
+## Normality of distribution
+bartlett.test(shell ~ treatment, data = d.shell)
+leveneTest(shell ~ treatment, data = d.shell)
+# Summary
+summary(a.shell.all)
+TukeyHSD(a.shell.all)
+plot(TukeyHSD(a.shell.all, conf.level = 0.99),las=1, col = "red")
+```
+```{r}
+ruskal.shell.all <- kruskal.test(shell ~ treatment, data = d.shell)
+# POSTHOC Testing
+# I like this test and it is relevant with equal replicates
+#nemenyi.sgr<-posthoc.kruskal.nemenyi.test(sp.sgr.sum$mean.sgr, sp.sgr.sum$treatment, "Tukey")
+#summary(nemenyi.sgr)
+
+dunn.shell.all = dunnTest(shell ~ treatment, data = d.shell,
+              method="bh")
+print(dunn.shell.all)
+```
+
+### Time 1
+```{r}
+# filtering
+shell.105 <- d.shell %>%
+  filter(time == "105")
+a.shell.105 <- aov(shell ~ treatment, data = shell.105)
+# tests
+library(car)
+## Residuals
+par(mfrow=c(2,2))
+plot(a.shell.105)
+r.shell.105<-resid(a.shell.105)
+shapiro.test(r.shell.105)
+## Normality of distribution
+bartlett.test(shell ~ treatment, data = shell.105)
+leveneTest(shell ~ treatment, data = shell.105)
+# Summary
+summary(a.shell.105)
+TukeyHSD(a.shell.105)
+plot(TukeyHSD(a.shell.105, conf.level = 0.99),las=1, col = "red")
+```
+Failed the tests for homogenaity of variaence and sum of quares.
+
+```{r}
+ruskal.shell <- kruskal.test(shell ~ treatment, data = shell.105)
+# POSTHOC Testing
+# I like this test and it is relevant with equal replicates
+#nemenyi.sgr<-posthoc.kruskal.nemenyi.test(sp.sgr.sum$mean.sgr, sp.sgr.sum$treatment, "Tukey")
+#summary(nemenyi.sgr)
+
+dunn.shell.105 = dunnTest(shell ~ treatment, data = shell.105,
+              method="bh")
+print(dunn.shell.105)
+```
+### Time 2
+```{r}
+# filtering
+shell.215 <- d.shell %>%
+  filter(time == "215")
+a.shell.215 <- aov(shell ~ treatment, data = shell.215)
+# tests
+library(car)
+## Residuals
+par(mfrow=c(2,2))
+plot(a.shell.215)
+r.shell.215<-resid(a.shell.215)
+shapiro.test(r.shell.215)
+## Normality of distribution
+bartlett.test(shell ~ treatment, data = shell.215)
+leveneTest(shell ~ treatment, data = shell.215)
+# Summary
+summary(a.shell.215)
+TukeyHSD(a.shell.215)
+plot(TukeyHSD(a.shell.215, conf.level = 0.99),las=1, col = "red")
+
+summarySE(shell.215, measurevar="shell", groupvars=c("treatment"), na.rm = TRUE)
+```
+# Muscle moisture
+## Final plot
+```{r}
+d.moist.se<-summarySE(d.moist, measurevar="moisture", groupvars=c("time", "treatment", "replicate"), na.rm = TRUE)
+ggpub.d.moist <- d.moist %>%
+  ggline(x = "time", y = "moisture", group = "treatment",
+         ggtheme = theme_pubr(),
+         color = "treatment", add = "mean_se",
+         facet.by = "treatment",
+         nrow = "1", 
+         ylim = c(70, 80),
+         legend = "none",
+         main = "A",
+         x.text.angle = 90,
+         xlab = "",
+         ylab = "Tissue Moisture (%)",
+         palette = c("#d900e7", "#09be4e", "#09bea8", "#0979be", "#091ebe", "#020202"),
+         label = NULL) +
+         stat_compare_means(method = "t.test", 
+                            paired = FALSE,
+                            label = "p.signif", 
+                            label.y = 78,
+                            size = 5,
+                            hide.ns = TRUE) + 
+  grids(linetype = "dotted") +
+  geom_hline(yintercept = 75.79840, linetype = 2)  
+#  rremove("x.text")
+ggpub.d.moist
+```
+## Statistics
+### All data average
+```{r}
+# Summary by treatent
+moist_treatment <- summarySE(d.moist, measurevar="moisture", groupvars=c("time","treatment"), na.rm = TRUE)
+
+# fitting
+a.moist.all <- aov(moisture ~ treatment, data = d.moist)
+# tests
+library(car)
+## Residuals
+par(mfrow=c(2,2))
+plot(a.moist.all)
+r.moist.all<-resid(a.moist.all)
+shapiro.test(r.moist.all)
+## Normality of distribution
+bartlett.test(moisture ~ treatment, data = d.moist)
+leveneTest(moisture ~ treatment, data = d.moist)
+# Summary
+summary(a.moist.all)
+TukeyHSD(a.moist.all)
+plot(TukeyHSD(a.moist.all, conf.level = 0.99),las=1, col = "red")
+```
+### Time 1
+```{r}
+# filtering
+moist.105 <- d.moist %>%
+  filter(time == "105")
+a.moist.105 <- aov(moisture ~ treatment, data = moist.105)
+# tests
+library(car)
+## Residuals
+par(mfrow=c(2,2))
+plot(a.moist.105)
+r.moist.105<-resid(a.moist.105)
+shapiro.test(r.moist.105)
+## Normality of distribution
+bartlett.test(moisture ~ treatment, data = moist.105)
+leveneTest(moisture ~ treatment, data = moist.105)
+# Summary
+summary(a.moist.105)
+TukeyHSD(a.moist.105)
+plot(TukeyHSD(a.moist.105, conf.level = 0.99),las=1, col = "red")
+```
+### Time 2
+```{r}
+# filtering
+moist.215 <- d.moist %>%
+  filter(time == "215")
+a.moist.215 <- aov(moisture ~ treatment, data = moist.215)
+# tests
+library(car)
+## Residuals
+par(mfrow=c(2,2))
+plot(a.moist.215)
+r.moist.215<-resid(a.moist.215)
+shapiro.test(r.moist.215)
+## Normality of distribution
+bartlett.test(moisture ~ treatment, data = moist.215)
+leveneTest(moisture ~ treatment, data = moist.215)
+# Summary
+summary(a.moist.215)
+TukeyHSD(a.moist.215)
+plot(TukeyHSD(a.moist.215, conf.level = 0.99),las=1, col = "red")
+
+summarySE(moist.215, measurevar="moisture", groupvars=c("treatment"), na.rm = TRUE)
+```
+# Muscle glycogen
+## Final plot
+```{r}
+d.gly.se<-summarySE(d.gly, measurevar="glycogen", groupvars=c("time", "treatment"), na.rm = TRUE)
+ggpub.d.gly <- d.gly %>%
+  ggline(x = "time", y = "glycogen", group = "treatment",
+         ggtheme = theme_pubr(),
+         color = "treatment", add = "mean_se",
+         facet.by = "treatment",
+         nrow = "1", 
+         ylim = c(0, 100),
+         legend = "none",
+         main = "B",
+         x.text.angle = 90,
+         xlab = "Day",
+         ylab = "Muscle glycogen (g/kg)",
+         palette = c("#d900e7", "#09be4e", "#09bea8", "#0979be", "#091ebe", "#020202"),
+         label = NULL) +
+         stat_compare_means(method = "t.test", 
+                            paired = FALSE,
+                            label = "p.signif", 
+                            label.y = 79,
+                            size = 5,
+                            hide.ns = TRUE) + 
+  grids(linetype = "dotted") +
+  geom_hline(yintercept = 15.95962, linetype = 2) 
+ggpub.d.gly
+```
+## Statistics
+### All data average
+```{r}
+# Summary by treatent
+gly_treatment <- summarySE(d.gly, measurevar="glycogen", groupvars=c("time","treatment"), na.rm = TRUE)
+
+# fitting
+a.gly.all <- aov(glycogen ~ treatment, data = d.gly)
+# tests
+library(car)
+## Residuals
+par(mfrow=c(2,2))
+plot(a.moist.all)
+r.gly.all<-resid(a.gly.all)
+shapiro.test(r.gly.all)
+## Normality of distribution
+bartlett.test(glycogen ~ treatment, data = d.gly)
+leveneTest(glycogen ~ treatment, data = d.gly)
+# Summary
+summary(a.gly.all)
+TukeyHSD(a.gly.all)
+plot(TukeyHSD(a.gly.all, conf.level = 0.99),las=1, col = "red")
+```
+### Time 1
+```{r}
+# filtering
+gly.105 <- d.gly %>%
+  filter(time == "105")
+a.gly.105 <- aov(glycogen ~ treatment, data = gly.105)
+# tests
+library(car)
+## Residuals
+par(mfrow=c(2,2))
+plot(a.gly.105)
+r.gly.105<-resid(a.gly.105)
+shapiro.test(r.gly.105)
+## Normality of distribution
+bartlett.test(glycogen ~ treatment, data = gly.105)
+leveneTest(glycogen ~ treatment, data = gly.105)
+# Summary
+summary(a.gly.105)
+TukeyHSD(a.gly.105)
+plot(TukeyHSD(a.gly.105, conf.level = 0.99),las=1, col = "red")
+```
+### Time 2
+```{r}
+# filtering
+gly.215 <- d.gly %>%
+  filter(time == "215")
+a.gly.215 <- aov(glycogen ~ treatment, data = gly.215)
+# tests
+library(car)
+## Residuals
+par(mfrow=c(2,2))
+plot(a.gly.215)
+r.gly.215<-resid(a.gly.215)
+shapiro.test(r.gly.215)
+## Normality of distribution
+bartlett.test(glycogen ~ treatment, data = gly.215)
+leveneTest(glycogen ~ treatment, data = gly.215)
+# Summary
+summary(a.gly.215)
+TukeyHSD(a.gly.215)
+plot(TukeyHSD(a.gly.215, conf.level = 0.99),las=1, col = "red")
+
+summarySE(gly.215, measurevar="glycogen", groupvars=c("treatment"), na.rm = TRUE)
+```
+
+Failed the tests for homogenaity of variaence and sum of quares.
+
+```{r}
+ruskal.gly <- kruskal.test(glycogen ~ treatment, data = gly.215)
+# POSTHOC Testing
+# I like this test and it is relevant with equal replicates
+#nemenyi.sgr<-posthoc.kruskal.nemenyi.test(sp.sgr.sum$mean.sgr, sp.sgr.sum$treatment, "Tukey")
+#summary(nemenyi.sgr)
+
+dunn.gly = dunnTest(glycogen ~ treatment, data = gly.215,
+              method="bh")
+print(dunn.gly)
+```
+# SGR
+## LOAD
+
+I will select only the data for weight. I will use this to create SGR for each individual anaimal
+
+```{r}
+sp.sgr <- sp1 %>%
+  select(time, replicate, treatment, id, weight) %>%
+  na.omit()
+```
+
+Making wide format
+
+```{r}
+sp.sgr.w <- sp.sgr %>%
+  spread(key = time, value = weight) 
+```
+
+```{r old code, echo=FALSE}
+#df <- sp.sgr %>% 
+#  group_by(time) %>% 
+#  tibble::rowid_to_column()
+#df
+#
+#df %>% 
+#  spread(time, weight)
+#
+#sgr.0 <- sp.sgr %>%
+#  filter(time == "0") %>%
+#  select(-time)
+#sgr.1 <- sp.sgr %>%
+#  filter(time == "1")  %>%
+#  select(-time)
+#sgr.2 <- sp.sgr %>%
+#  filter(time == "2")  %>%
+#  select(-time)
+  
+
+#sgr.j <- left_join(x = sgr.0, y = sgr.1, by = c("treatment", "replicate", "id"))
+#sgr.j.full <- left_join(x = sgr.j, y = sgr.2, by = c("treatment", "replicate", "id"))
+
+```
+
+calculating sgr for each animal at the end point
+
+```{r}
+sp.sgr.w <- within(sp.sgr.w, sgr1 <- (((log(`1`))-(log(`0`)))/105)*100)  # Leaving this out
+sp.sgr.w <- within(sp.sgr.w, sgr2 <- (((log(`2`))-(log(`1`)))/110)*100) # Leaving this out
+sp.sgr.w <- within(sp.sgr.w, sgrT <- (((log(`2`))-(log(`0`)))/215)*100)
+```
+
+Gathering the long format table, removing negatives, and summerizing for statistics
+
+```{r}
+sp.sgr.all <- sp.sgr.w %>%
+  select(-`0`, -`1`, -`2`) %>%
+  #gather('sgrT', key = "temp", value = "weight") %>% # Relevant if each time is included
+  gather('sgr1', 'sgr2', key = "temp", value = "weight") %>% # Relevant if each time is included
+  #gather('sgr1', 'sgr2', 'sgrT', key = "temp", value = "weight") 
+  #gather('sgrT', key = "temp", value = "sgr") %>%
+  dplyr::rename(time = temp, 
+                sgr = weight) %>%
+  filter(sgr >= 0)
+
+#Rename the SGR.i to a time
+revalue(sp.sgr.all$time, c("sgr1" = "105")) -> sp.sgr.all$time
+revalue(sp.sgr.all$time, c("sgr2" = "215")) -> sp.sgr.all$time
+revalue(sp.sgr.all$treatment, c("1" = "AB")) -> sp.sgr.all$treatment
+revalue(sp.sgr.all$treatment, c("2" = "ABFU")) -> sp.sgr.all$treatment
+revalue(sp.sgr.all$treatment, c("3" = "AB10U")) -> sp.sgr.all$treatment
+revalue(sp.sgr.all$treatment, c("4" = "AB1U")) -> sp.sgr.all$treatment
+revalue(sp.sgr.all$treatment, c("5" = "AB0.1U")) -> sp.sgr.all$treatment
+revalue(sp.sgr.all$treatment, c("6" = "FU")) -> sp.sgr.all$treatment
+
+################
+
+# doing it for the entire period in one group
+sp.sgr.T <- sp.sgr.w %>%
+  select(-`0`, -`1`, -`2`, -'sgr1', -'sgr2') %>%
+  gather('sgrT', key = "temp", value = "weight") %>% # Relevant if each time is included
+  #gather('sgr1', 'sgr2', key = "temp", value = "weight") %>% # Relevant if each time is included
+  #gather('sgr1', 'sgr2', 'sgrT', key = "temp", value = "weight") 
+  #gather('sgrT', key = "temp", value = "sgr") %>%
+  dplyr::rename(time = temp, 
+                sgr = weight) %>%
+  filter(sgr >= 0)
+
+#Rename 
+revalue(sp.sgr.T$time, c("sgr1" = "105")) -> sp.sgr.T$time
+revalue(sp.sgr.T$time, c("sgr2" = "215")) -> sp.sgr.T$time
+revalue(sp.sgr.T$treatment, c("1" = "AB")) -> sp.sgr.T$treatment
+revalue(sp.sgr.T$treatment, c("2" = "ABFU")) -> sp.sgr.T$treatment
+revalue(sp.sgr.T$treatment, c("3" = "AB10U")) -> sp.sgr.T$treatment
+revalue(sp.sgr.T$treatment, c("4" = "AB1U")) -> sp.sgr.T$treatment
+revalue(sp.sgr.T$treatment, c("5" = "AB0.1U")) -> sp.sgr.T$treatment
+revalue(sp.sgr.T$treatment, c("6" = "FU")) -> sp.sgr.T$treatment
+```
+## PLOT
+```{r}
+#Finding min and max for both time points
+#sp.sgr.l %>%
+#  filter(print(sgr), print(sgr == max(sgr)), sgr == max(sgr))
+#sp.sgr.l %>%
+#  filter(print(sgr), print(sgr == min(sgr)), sgr == min(sgr))
+
+# Gettting the means
+sp.sgr.T %>%
+  group_by(treatment) %>%
+  dplyr::summarise(mean.sgr = mean(sgr),
+                   sd = sd(sgr))
+
+#AB	0.1626849			
+#ABFU	0.2142052			
+#AB10U	0.1584557			
+#AB1U	0.1708044			
+#AB0.1U	0.1955536			
+#FU	0.1421385	
+#sgr_2021 <- summarySE(sp.sgr.T, measurevar="sgr", groupvars=c("treatment"), na.rm = TRUE)
+
+# Filtering the data
+gg_sgr_overall <- sp.sgr.T %>%
+  na.omit() %>%
+# Setting the plot  
+  ggplot() +
+    theme_pubr() +
+    stat_boxplot(outlier.shape=NA, aes(x = treatment, y = sgr, fill = treatment),
+                 alpha = 0.8, size = 0.75, width = 0.5, coef = 2.5, notch = TRUE) +
+  scale_y_continuous(limits=c(0,0.45), breaks=seq(0,0.45, by = 0.1)) +
+  scale_fill_manual(values = 
+                        c("#d900e7", "#09be4e", "#09bea8", "#0979be", "#091ebe", "#020202")) +
+# Creating the boxes to cover the violin
+    annotate("rect", xmin = 1, xmax = 1.5, ymin = 0, ymax = 0.45, alpha = 1, fill = 'white') +
+    annotate("rect", xmin = 2, xmax = 2.5, ymin = 0, ymax = 0.45, alpha = 1, fill = 'white') +
+    annotate("rect", xmin = 3, xmax = 3.5, ymin = 0, ymax = 0.45, alpha = 1, fill = 'white') +
+    annotate("rect", xmin = 4, xmax = 4.5, ymin = 0, ymax = 0.45, alpha = 1, fill = 'white') +
+    annotate("rect", xmin = 5, xmax = 5.5, ymin = 0, ymax = 0.45, alpha = 1, fill = 'white') +
+    annotate("rect", xmin = 6, xmax = 6.5, ymin = 0, ymax = 0.45, alpha = 1, fill = 'white') +
+# Adding the jitter
+  geom_point(aes(x = as.numeric(treatment) + 0.1, y = sgr),
+               alpha = 0.8, size = 0.150, position = position_jitter(width = 0.05)) +
+# Adding the stat summary
+  stat_summary(aes(x = treatment, y = sgr), fun="mean", geom="point", shape=22, size=3, fill="white", na.rm = T) +
+#  facet_wrap(~time, nrow = 2) +
+
+  # Creating the labels for significance
+  # 1
+  annotate("text", x = 0.65, y = 0.1626849, 
+           label="a", family="serif",
+           colour="black", size=4) +
+  # 2
+  annotate("text", x=1.65, y=0.2142052, 
+           label="b", family="serif",
+           colour="black", size=4) +
+  # 3
+  annotate("text", x=2.65, y=0.1584557, 
+           label="a", family="serif",
+           colour="black", size=4) +
+  # 4
+  annotate("text", x=3.65, y=0.1708044, 
+           label="a", family="serif",
+           colour="black", size=4) +
+  # 5
+  annotate("text", x=4.65, y=0.1955536, 
+           label="c", family="serif",
+           colour="black", size=4) +
+  # 6
+  annotate("text", x=5.65, y=0.1421385, 
+           label="a", family="serif",
+           colour="black", size=4) +
+# Plot labels
+ # ggtitle("B") + 
+  theme(plot.title=element_text()) +
+  #theme(axis.text.x = element_text(angle = 0, vjust = 0.5)) +
+  theme(legend.position="none") + 
+  #scale_x_discrete(breaks=c("1", "2", "3", "4", "5", "6"),
+  #                 labels=c("AB", "ABFU", "AB10U", "AB1U", "AB0.1U", "FU")) +
+  labs(x="Diet", 
+       y="SGR (% BW/day)") 
+  #rremove("x.text") +
+  #ggtitle("A")
+
+```
+## ANALYSIS
+### All data average
+```{r}
+# ANOVA SGR for end point sp.sgr.all
+#sgr_time_id <- summarySE(sp.sgr.T, measurevar="sgrT", groupvars=c("treatment", "replicate", "id"), na.rm = TRUE)
+
+# Summary by replicate
+#sgr_rep <- summarySE(sp.sgr.T, measurevar="sgr", groupvars=c("treatment", "replicate"), na.rm = TRUE)
+
+# Summary by treatent
+#sgr_treatment <- summarySE(sp.sgr.T, measurevar="sgr", groupvars=c("treatment"), na.rm = TRUE)
+
+#AB	5	0.1536388   	0.012030238	0.005380086	0.014937513
+#ABFU	5	0.2157094   	0.007794549	0.003485828	0.009678211
+#AB10U	5	0.1575832	   0.013245274	0.005923466	0.016446179
+#AB1U	5	0.1704690   	0.016383365	0.007326864	0.020342635
+#AB0.1U	5	0.1947586   	0.013137937	0.005875464	0.016312903
+#FU	5	0.1811603   	0.050604395	0.022630973	0.062833655
+
+a.sgr.T <- aov(sgr ~ treatment, data = sp.sgr.T)
+summary(a.sgr.T)
+# tests
+library(car)
+## Residuals
+par(mfrow=c(2,2))
+plot(a.sgr.T)
+r.sgrT<-resid(a.sgr.T)
+shapiro.test(r.sgrT)
+## Normality of distribution
+bartlett.test(sgr ~ treatment, data = sp.sgr.T)
+leveneTest(sgr ~ treatment, data = sp.sgr.T)
+# Analysis
+kruskal.sgr <- kruskal.test(sgr ~ treatment, data = sp.sgr.T)
+# POSTHOC Testing
+# I like this test and it is relevant with equal replicates
+#nemenyi.sgr<-posthoc.kruskal.nemenyi.test(sp.sgr.sum$mean.sgr, sp.sgr.sum$treatment, "Tukey")
+#summary(nemenyi.sgr)
+summarySE(sp.sgr.T, measurevar="sgr", groupvars=c("treatment"), na.rm = TRUE)
+
+dunn.sgr = dunnTest(sgr ~ treatment, data = sp.sgr.T,
+              method="bh")
+print(dunn.sgr)
+#1 - 2	6.116790e-11	
+#1 - 3	7.349701e-01	
+#2 - 3	3.591537e-12	
+#1 - 4	3.885290e-01	
+#2 - 4	1.193173e-08	
+#3 - 4	2.062485e-01	
+#1 - 5	7.100045e-05	
+#2 - 5	2.526315e-02	
+#3 - 5	1.209846e-05	
+#4 - 5	2.094503e-03
+#1 - 6	6.312739e-01	
+#2 - 6	1.856684e-12	
+#3 - 6	8.413203e-01	
+#4 - 6	1.530822e-01	
+#5 - 6	5.975489e-06
+```
+### Time 1
+```{r}
+# filtering
+sgr_105 <- sp.sgr.all %>%
+  filter(time == "105")
+a.sgr.105 <- aov(sgr ~ treatment, data = sgr_105)
+# tests
+library(car)
+## Residuals
+par(mfrow=c(2,2))
+plot(a.sgr.105)
+r.sgr.105<-resid(a.sgr.105)
+shapiro.test(r.sgr.105) #FAILED
+## Normality of distribution
+bartlett.test(sgr ~ treatment, data = sgr_105)
+leveneTest(sgr ~ treatment, data = sgr_105)
+# Summary
+summary(a.sgr.105)
+TukeyHSD(a.sgr.105)
+plot(TukeyHSD(a.sgr.105, conf.level = 0.99),las=1, col = "red")
+```
+```{r}
+ruskal.sgr.105 <- kruskal.test(sgr ~ treatment, data = sgr_105)
+# POSTHOC Testing
+# I like this test and it is relevant with equal replicates
+#nemenyi.sgr<-posthoc.kruskal.nemenyi.test(sp.sgr.sum$mean.sgr, sp.sgr.sum$treatment, "Tukey")
+#summary(nemenyi.sgr)
+
+dunn.sgr.105 = dunnTest(sgr ~ treatment, data = sgr_105, method="bh")
+print(dunn.sgr.105)
+```
+### Time 2
+```{r}
+# filtering
+sgr_215 <- sp.sgr.all %>%
+  filter(time == "215")
+a.sgr.215 <- aov(sgr ~ treatment, data = sgr_215)
+# tests
+library(car)
+## Residuals
+par(mfrow=c(2,2))
+plot(a.sgr.105)
+r.sgr.215<-resid(a.sgr.215)
+shapiro.test(r.sgr.215) #FAILED
+## Normality of distribution
+bartlett.test(sgr ~ treatment, data = sgr_215)
+leveneTest(sgr ~ treatment, data = sgr_215)
+# Summary
+summary(a.sgr.215)
+TukeyHSD(a.sgr.215)
+plot(TukeyHSD(a.sgr.215, conf.level = 0.99),las=1, col = "red")
+```
+
+Failed the tests for homogenaity of variaence and sum of quares.
+
+```{r}
+ruskal.sgr.215 <- kruskal.test(sgr ~ treatment, data = sgr_215)
+# POSTHOC Testing
+# I like this test and it is relevant with equal replicates
+#nemenyi.sgr<-posthoc.kruskal.nemenyi.test(sp.sgr.sum$mean.sgr, sp.sgr.sum$treatment, "Tukey")
+#summary(nemenyi.sgr)
+
+dunn.sgr.215 = dunnTest(sgr ~ treatment, data = sgr_215,
+              method="bh")
+print(dunn.sgr.215)
+```
+
+
+Some lost but interesting code
+```{r}
+
+#dunn.sgr = dunnTest(mean.sgr ~ treatment, data = sp.sgr.sum,
+#              method="bh")
+# Alternatively the M-U test can be done but I think the Nemenyi is more appropriate here
+#PT = pairwise.wilcox.test(sgr_215$sgr, 
+##                          sgr_215$treatment, 
+#                          p.adjust.method="BY")
+#PT = PT$p.value
+#install.packages("rcompanion")
+#install.packages("multcompView")
+#library("rcompanion")
+#PT1 = fullPTable(PT)
+#library(multcompView)
+#multcompLetters(PT1, 
+#                compare="<", 
+#                threshold=0.05,
+#                Letters=letters,
+#                reversed = FALSE)
+```
+# MISL
+## LOAD
+```{r}
+sp.misl <- sp1 %>%
+  select(time, replicate, tank, treatment, id, length) %>%
+  na.omit()
+```
+
+
+Making wide format
+```{r}
+sp.misl.w <- sp.misl %>%
+  spread(key = time, value = length)
+```
+
+calculating sgr for each animal
+
+```{r}
+sp.misl.w <- within(sp.misl.w, misl1 <- (((`1`)-(`0`))/105)*30)
+sp.misl.w <- within(sp.misl.w, misl2 <- (((`2`)-(`1`))/110)*30)
+sp.misl.T <- within(sp.misl.w, mislT <- (((`2`)-(`0`))/215)*30)
+```
+
+Gathering the long format table
+
+```{r}
+sp.misl.all <- sp.misl.w %>%
+  select(-`0`, -`1`, -`2`) %>%
+  #gather('mislT', key = "temp", value = "mislT") %>%
+  #gather('dislT', key = "temp", value = "length") %>%
+  gather('misl1', 'misl2', key = "temp", value = "weight") %>%
+  #gather('sgr1', 'sgr2', 'sgrT', key = "temp", value = "weight") %>%
+  dplyr::rename(time = temp, 
+                misl = weight) %>%
+  filter(misl >= 0)
+
+#Rename the SGR.i to a time
+revalue(sp.misl.all$time, c("misl1" = "105")) -> sp.misl.all$time
+revalue(sp.misl.all$time, c("misl2" = "215")) -> sp.misl.all$time
+revalue(sp.misl.all$treatment, c("1" = "AB")) -> sp.misl.all$treatment
+revalue(sp.misl.all$treatment, c("2" = "ABFU")) -> sp.misl.all$treatment
+revalue(sp.misl.all$treatment, c("3" = "AB10U")) -> sp.misl.all$treatment
+revalue(sp.misl.all$treatment, c("4" = "AB1U")) -> sp.misl.all$treatment
+revalue(sp.misl.all$treatment, c("5" = "AB0.1U")) -> sp.misl.all$treatment
+revalue(sp.misl.all$treatment, c("6" = "FU")) -> sp.misl.all$treatment
+  
+################
+
+# doing it for the entire period in one group
+sp.misl.T <- sp.misl.T %>%
+  select(-`0`, -`1`, -`2`, -'misl1', -'misl2') %>%
+  gather('mislT', key = "temp", value = "weight") %>% # Relevant if each time is included
+  #gather('misl1', 'misl2', key = "temp", value = "weight") %>% # Relevant if each time is included
+  #gather('misl1', 'misl2', 'mislT', key = "temp", value = "weight") 
+  #gather('mislT', key = "temp", value = "misl") %>%
+  dplyr::rename(time = temp, 
+                misl = weight) %>%
+  filter(misl >= 0)
+
+#Rename 
+revalue(sp.misl.T$time, c("misl1" = "105")) -> sp.misl.T$time
+revalue(sp.misl.T$time, c("misl2" = "215")) -> sp.misl.T$time
+revalue(sp.misl.T$treatment, c("1" = "AB")) -> sp.misl.T$treatment
+revalue(sp.misl.T$treatment, c("2" = "ABFU")) -> sp.misl.T$treatment
+revalue(sp.misl.T$treatment, c("3" = "AB10U")) -> sp.misl.T$treatment
+revalue(sp.misl.T$treatment, c("4" = "AB1U")) -> sp.misl.T$treatment
+revalue(sp.misl.T$treatment, c("5" = "AB0.1U")) -> sp.misl.T$treatment
+revalue(sp.misl.T$treatment, c("6" = "FU")) -> sp.misl.T$treatment
+
+```
+## PLOT
+```{r}
+#Finding min and max for both time points
+#sp.misl.l %>%
+#  filter(print(mislT), print(mislT == max(mislT)), mislT == max(mislT))
+#sp.misl.l %>%
+#  filter(print(mislT), print(mislT == min(mislT)), mislT == min(mislT))
+
+# Gettting the means
+#sp.misl.T %>%
+#  group_by(treatment) %>%
+#dplyr::summarise(mean.misl = mean(misl))
+
+misl_treatment <- summarySE(sp.misl.T, measurevar="misl", groupvars=c("treatment"), na.rm = TRUE)
+
+#1 AB             1.089381
+#2 ABFU           1.387930
+#3 AB10U          1.091456
+#4 AB1U           1.093539
+#5 AB0.1U         1.239854
+#6 FU             1.032355
+
+# Filtering the data
+gg_misl_overall <- sp.misl.T %>%
+  na.omit() %>%
+# Setting the plot  
+  ggplot() +
+    theme_pubr() +
+    stat_boxplot(outlier.shape=NA, aes(x = treatment, y = misl, fill = treatment),
+                 alpha = 1, 
+                 size = 0.75, 
+                 width = 0.5, 
+                 coef = 2.5, 
+                 notch = TRUE) +
+  scale_y_continuous(limits=c(0,2.5), breaks=seq(0,2.5, by = 0.5)) +
+  scale_fill_manual(values = 
+                        c("#d900e7", "#09be4e", "#09bea8", "#0979be", "#091ebe", "#020202")) +
+# Creating the boxes to cover the violin
+    annotate("rect", xmin = 1, xmax = 1.5, ymin = 0, ymax = 2.5, alpha = 1, fill = 'white') +
+    annotate("rect", xmin = 2, xmax = 2.5, ymin = 0, ymax = 2.5, alpha = 1, fill = 'white') +
+    annotate("rect", xmin = 3, xmax = 3.5, ymin = 0, ymax = 2.5, alpha = 1, fill = 'white') +
+    annotate("rect", xmin = 4, xmax = 4.5, ymin = 0, ymax = 2.5, alpha = 1, fill = 'white') +
+    annotate("rect", xmin = 5, xmax = 5.5, ymin = 0, ymax = 2.5, alpha = 1, fill = 'white') +
+    annotate("rect", xmin = 6, xmax = 6.5, ymin = 0, ymax = 2.5, alpha = 1, fill = 'white') +
+# Adding the jitter
+  geom_point(aes(x = as.numeric(treatment) + 0.1, y = misl),
+               alpha = 0.8, size = 0.15, position = position_jitter(width = 0.05)) +
+# Adding the stat summary
+  stat_summary(aes(x = treatment, y = misl), fun="mean", geom="point", shape=22, size=3, fill="white", na.rm = T) +
+  #facet_wrap(~time, nrow = 2) +
+# Creating the labels for significance
+  # 1
+  annotate("text", x = 0.65, y = 1.089381, 
+           label="a", family="serif",
+           colour="black", size=4) +
+  # 2
+  annotate("text", x=1.65, y=1.387930, 
+           label="b", family="serif",
+           colour="black", size=4) +
+  # 3
+  annotate("text", x=2.65, y=1.091456, 
+           label="a", family="serif",
+           colour="black", size=4) +
+  # 4
+  annotate("text", x=3.65, y=1.093539, 
+           label="a", family="serif",
+           colour="black", size=4) +
+  # 5
+  annotate("text", x=4.65, y=1.239854, 
+           label="ab", family="serif",
+           colour="black", size=4) +
+  # 6
+  annotate("text", x=5.65, y=1.032355, 
+           label="a", family="serif",
+           colour="black", size=4) +
+# Plot labels
+  #ggtitle("B") + 
+  theme(axis.text.x = element_text(angle = 0, vjust = 0.5)) +
+  theme(legend.position="none") + 
+ # scale_x_discrete(breaks=c("1", "2", "3", "4", "5", "6"),
+#                   labels=c("AB", "ABFU", "AB10U", "AB1U", "AB0.1U", "FU")) +
+  labs(x="Diet",
+       y="MISL (mm/month)") 
+  #rremove("x.text") +
+  #ggtitle("A")
+
+
+gg_misl_overall
+```
+## ANALYSIS
+### All data avarage
+```{r}
+# ANOVA SGR for end point sp.sgr.all
+misl_time_id <- summarySE(sp.misl.all, measurevar="misl", groupvars=c("treatment", "replicate", "id"), na.rm = TRUE)
+
+# Summary by replicate
+misl_rep <- summarySE(misl_time_id, measurevar="misl", groupvars=c("treatment", "replicate"), na.rm = TRUE)
+
+# Summary by treatent
+misl_treatment <- summarySE(sp.misl.T, measurevar="misl", groupvars=c("treatment"), na.rm = TRUE)
+
+# Summary by replicate
+misl_rep_t <- summarySE(sp.misl.T, measurevar="misl", groupvars=c("treatment", "replicate"), na.rm = TRUE)
+
+#AB	5	0.1536388   	0.012030238	0.005380086	0.014937513
+#ABFU	5	0.2157094   	0.007794549	0.003485828	0.009678211
+#AB10U	5	0.1575832	   0.013245274	0.005923466	0.016446179
+#AB1U	5	0.1704690   	0.016383365	0.007326864	0.020342635
+#AB0.1U	5	0.1947586   	0.013137937	0.005875464	0.016312903
+#FU	5	0.1811603   	0.050604395	0.022630973	0.062833655
+
+a.misl.T <- aov(misl ~ treatment, data = misl_rep_t)
+summary(a.misl.T)
+# tests
+library(car)
+## Residuals
+par(mfrow=c(2,2))
+plot(a.misl.T)
+r.mislT<-resid(a.misl.T)
+shapiro.test(r.mislT)
+## Normality of distribution
+bartlett.test(misl ~ treatment, data = misl_rep_t)
+leveneTest(misl ~ treatment, data = misl_rep_t)
+# Analysis
+a.misl.T <- aov(misl ~ treatment, data = misl_rep_t)
+# POSTHOC Testing
+# Summary
+summary(a.misl.T)
+TukeyHSD(a.misl.T)
+plot(TukeyHSD(a.misl.T, conf.level = 0.99),las=0, col = "red")
+summarySE(sp.misl.T, measurevar="misl", groupvars=c("treatment"), na.rm = TRUE)
+```
+### Time 1
+```{r}
+# filtering
+misl_105 <- sp.misl.all %>%
+  filter(time == "105")
+a.misl.105 <- aov(misl ~ treatment, data = misl_105)
+# tests
+library(car)
+## Residuals
+par(mfrow=c(2,2))
+plot(a.misl.105)
+r.misl.105<-resid(a.misl.105)
+shapiro.test(r.misl.105) #FAILED
+## Normality of distribution
+bartlett.test(misl ~ treatment, data = misl_105)
+leveneTest(misl ~ treatment, data = misl_105)
+# Summary
+summary(a.misl.105)
+TukeyHSD(a.misl.105)
+plot(TukeyHSD(a.misl.105, conf.level = 0.99),las=1, col = "red")
+```
+
+failed tests for stats
+
+```{r}
+ruskal.misl.105 <- kruskal.test(misl ~ treatment, data = misl_105)
+# POSTHOC Testing
+# I like this test and it is relevant with equal replicates
+#nemenyi.misl<-posthoc.kruskal.nemenyi.test(sp.misl.sum$mean.misl, sp.misl.sum$treatment, "Tukey")
+#summary(nemenyi.misl)
+
+dunn.misl.105 = dunnTest(misl ~ treatment, data = misl_105, method="bh")
+print(dunn.misl.105)
+```
+### Time 2
+```{r}
+# filtering
+misl_215 <- sp.misl.all %>%
+  filter(time == "215")
+a.misl.215 <- aov(misl ~ treatment, data = misl_215)
+# tests
+library(car)
+## Residuals
+par(mfrow=c(2,2))
+plot(a.misl.105)
+r.misl.215<-resid(a.misl.215)
+shapiro.test(r.misl.215) #FAILED
+## Normality of distribution
+bartlett.test(misl ~ treatment, data = misl_215)
+leveneTest(misl ~ treatment, data = misl_215)
+# Summary
+summary(a.misl.215)
+TukeyHSD(a.misl.215)
+plot(TukeyHSD(a.misl.215, conf.level = 0.99),las=1, col = "red")
+```
+# CF
+## LOAD
+Creating the datatables that will be used for plotting and analysis
+```{r}
+sp.cf <- sp1 %>%
+  select(time, replicate, tank, treatment, id, cf) %>%
+  na.omit()
+sp.cf.sum <- sp.cf %>%
+  ungroup() %>%
+  select(-id) %>%
+  group_by(time, treatment, replicate) %>%
+  dplyr::summarise(mean.cf = mean(cf))
+# Summary for plot
+sp.cf.se0<- sp.cf.sum %>%
+  filter(time == 0) %>%
+  summarySE(measurevar="mean.cf", groupvars=c("treatment"), na.rm = TRUE)
+#sp.cf.se1<- sp.cf.sum %>%
+#  filter(time == 1) %>%
+#  summarySE(measurevar="mean.cf", groupvars=c("treatment"), na.rm = TRUE)
+sp.cf.se2<- sp.cf.sum %>%
+  filter(time == 2) %>%
+  summarySE(measurevar="mean.cf", groupvars=c("treatment"), na.rm = TRUE)
+```
+
+```{r}
+revalue(sp.cf.sum$time, c("0" = "0")) -> sp.cf.sum$time
+revalue(sp.cf.sum$time, c("1" = "105")) -> sp.cf.sum$time
+revalue(sp.cf.sum$time, c("2" = "215")) -> sp.cf.sum$time 
+revalue(sp.cf.sum$treatment, c("1" = "AB")) -> sp.cf.sum$treatment
+revalue(sp.cf.sum$treatment, c("2" = "ABFU")) -> sp.cf.sum$treatment
+revalue(sp.cf.sum$treatment, c("3" = "AB10U")) -> sp.cf.sum$treatment
+revalue(sp.cf.sum$treatment, c("4" = "AB1U")) -> sp.cf.sum$treatment
+revalue(sp.cf.sum$treatment, c("5" = "AB0.1U")) ->sp.cf.sum$treatment 
+revalue(sp.cf.sum$treatment, c("6" = "FU")) -> sp.cf.sum$treatment 
+```
+## PLOT
+```{r}
+gg_cf.rpbu <- sp.cf.sum %>% 
+ ggline(x = "time", y = "mean.cf",
+         ggtheme = theme_pubr(),
+         color = "treatment", add = "mean_se",
+         facet.by = "treatment",
+         nrow = 1, 
+         ylim = c(0.95, 1.25),
+         legend = "none",
+         x.text.angle = 90,
+         xlab = "Day",
+         ylab = "Condition factor",
+         palette = c("#d900e7", "#09be4e", "#09bea8", "#0979be", "#091ebe", "#020202")) +
+         stat_compare_means(method = "anova", 
+                            label = "p.signif", 
+                            label.y = 1.2,
+                            size = 5,
+                            hide.ns = TRUE) +
+  grids(linetype = "dotted") +
+  geom_hline(yintercept = 1, linetype = 2) 
+```
+## ANALYSIS
+### Two-way
+```{r}
+cf.test <- sp.cf.all %>%
+  filter(time == "0"|
+         time == "215") %>% 
+  filter(treatment == "1"|
+           treatment == "2"|
+           treatment == "3"|
+           treatment == "4"|
+           treatment == "5"|
+           treatment == "6") %>%
+  mutate(time = as.factor(time),
+         treatment = as.factor(treatment))
+p.cf<- cf.test %>%
+summarySE(measurevar="cf", groupvars=c("treatment", "time", "replicate"), na.rm = TRUE)
+a.cf <- aov(cf ~ time * treatment, data = p.cf)
+# tests
+library(car)
+## Residuals
+par(mfrow=c(2,2))
+plot(a.cf)
+r.cf<-resid(a.cf)
+shapiro.test(r.cf)
+
+## Kruskal walis
+kruskal.cf <- kruskal.test(cf ~ time * treatment, data = p.cf)
+
+```
+### Time 0
+Passes test for stats
+```{r}
+# cf Time 0
+cf.0 <- sp.cf.sum %>%
+  filter(time == "0")
+a.cf.0 <- aov(mean.cf ~ treatment, data = cf.0)
+# tests
+## Residuals
+par(mfrow=c(2,2))
+plot(a.cf.0)
+r.cf.0<-resid(a.cf.0)
+shapiro.test(r.cf.0)
+## Normality of distribution
+bartlett.test(mean.cf ~ treatment, data = cf.0)
+leveneTest(mean.cf ~ treatment, data = cf.0)
+# Summary
+summary(a.cf.0)
+TukeyHSD(a.cf.0)
+plot(TukeyHSD(a.cf.0, conf.level = 0.99),las=0, col = "red")
+```
+
+### Time 1
+passes tests for stats
+```{r}
+# cf Time 1
+cf.1 <- sp.cf.sum %>%
+  filter(time == "105")
+a.cf.1 <- aov(mean.cf ~ treatment, data = cf.1)
+# tests
+## Residuals
+par(mfrow=c(2,2))
+plot(a.cf.1)
+r.cf.1<-resid(a.cf.1)
+shapiro.test(r.cf.1)
+## Normality of distribution
+bartlett.test(mean.cf ~ treatment, data = cf.1)
+leveneTest(mean.cf ~ treatment, data = cf.1)
+# Summary
+summary(a.cf.1)
+TukeyHSD(a.cf.1)
+plot(TukeyHSD(a.cf.1, conf.level = 0.99),las=1, col = "red")
+```
+
+### Time 2
+Fails tsts for stats
+No significan differance  p = 0.055
+```{r}
+# cf Time 2
+sp.cf.2 <- sp.cf.sum %>%
+  filter(time == "215")
+a.cf.2 <- aov(mean.cf ~ treatment, data = sp.cf.2)
+# tests
+## Residuals
+par(mfrow=c(2,2))
+plot(a.cf.2)
+r.cf.2<-resid(a.cf.2)
+shapiro.test(r.cf.2)
+## Normality of distribution
+bartlett.test(mean.cf ~ treatment, data = sp.cf.2)
+leveneTest(mean.cf ~ treatment, data = sp.cf.2)
+### FAILED normality and homogenaity TESTS
+kruskal.test(mean.cf ~ treatment, data = sp.cf.2)
+# Analysis
+kruskal.cf.2 <- kruskal.test(mean.cf ~ treatment, data = sp.cf.2)
+#	Kruskal-Wallis rank sum test#
+#
+#data:  mean.cf by treatment
+#Kruskal-Wallis chi-squared = 10.832, df = 5, p-value = 0.05481
+
+# POSTHOC Testing
+library(FSA)
+dunn.cf.2 = dunnTest(mean.cf ~ treatment, data = sp.cf.2,
+              method="bh")
+print(dunn.cf.2)
+summarySE(sp.cf.sum, measurevar="mean.cf", groupvars=c("treatment"), na.rm = TRUE)
+```
+```{r}
+ruskal.cf.215 <- kruskal.test(mean.cf ~ treatment, data = sp.cf.2)
+# POSTHOC Testing
+# I like this test and it is relevant with equal replicates
+#nemenyi.sgr<-posthoc.kruskal.nemenyi.test(sp.sgr.sum$mean.sgr, sp.sgr.sum$treatment, "Tukey")
+#summary(nemenyi.sgr)
+
+dunn.cf.215 = dunnTest(mean.cf ~ treatment, data = sp.cf.2,
+              method="bh")
+print(dunn.cf.215)
+```
+# NMDS
+
+## LOAD
+```{r}
+dg.pca <- dg %>%
+  select(-dnaid, -SWindex) %>%
+  group_by(treatment, replicate)
+
+
+revalue(dg.pca$treatment, c("1" = "AB")) -> dg.pca$treatment
+revalue(dg.pca$treatment, c("2" = "ABFU")) -> dg.pca$treatment
+revalue(dg.pca$treatment, c("3" = "AB10U")) -> dg.pca$treatment
+revalue(dg.pca$treatment, c("4" = "AB1U")) -> dg.pca$treatment
+revalue(dg.pca$treatment, c("5" = "AB0.1U")) ->dg.pca$treatment
+revalue(dg.pca$treatment, c("6" = "FU")) -> dg.pca$treatment
+
+```
+### Split the data
+```{r}
+
+data_1<-dg.pca[,4:46] #intensity and Rf for band locations
+data_2<-dg.pca[,1:3] # description of the data
+#data_3<-total[,4:8] #"environmetal" data ie gly moist...
+```
+### Transform the data
+```{r}
+# Creating a table of relative abundancefor each row
+abun <- data_1/rowSums(data_1)
+abun.log <- decostand (log1p (abun), method = 'hellinger')
+#abun.log <- log1p(abun)
+```
+
+```{r}
+#turn abundance data frame into a matrix
+m_abun.log = as.matrix(abun.log)
+```
+
+```{r}
+#Calculate the Bray-Curtis nMDS for 3-axis
+set.seed(123)
+m_abun.log.nmds <- metaMDS(m_abun.log, distance = "bray", trymax=1000, k=3,
+                         autotransform = FALSE)
+abun.log.nmds <- metaMDS(abun.log, distance = "bray", trymax=1000, k=3,
+                         autotransform = FALSE)
+
+```
+## PLOT
+Seeting up the variables
+```{r}
+# Plotting in ggplot
+#extract NMDS scores (x and y coordinates)
+co<-c("#d900e7", "#09be4e", "#09bea8", "#0979be", "#091ebe", "#020202")
+data.scores = as.data.frame(scores(m_abun.log.nmds))
+data.scores$Treatment = data_2$treatment
+data.scores$Replicate = data_2$replicate
+data.scores$ID = data_2$id
+```
+Axis 1 vs 2
+```{r}
+# 1 and 2
+ggndms1_2<- ggplot(data.scores, aes(x = NMDS1, y = NMDS2)) + 
+    geom_point(size = 2.5, aes(colour = Treatment))+ 
+    theme(axis.text.y = element_text(colour = "black", size = 10, face = "bold"), 
+    axis.text.x = element_text(colour = "black", face = "bold", size = 10), 
+    legend.text = element_text(size = 10, face ="bold", colour ="black"), 
+    legend.position = "none",
+    axis.title.y = element_text(face = "bold", size = 10), 
+    axis.title.x = element_text(face = "bold", size = 10, colour = "black"), 
+    legend.title = element_text(size = 14, colour = "black", face = "bold"), 
+    panel.background = element_blank(), panel.border = element_rect(colour = "black", fill = NA, size = 1.2),
+    legend.key=element_blank()) + 
+    labs(x = "NMDS1", colour = "Diet") + 
+    ggtitle("A") +
+    scale_y_continuous(limits=c(-1.1, 1.1), breaks=seq(-1, 1, by = 0.5)) +
+    scale_x_continuous(limits=c(-1.1, 1.1), breaks=seq(-1, 1, by = 0.5)) +
+    scale_colour_manual(values = c("#d900e7", "#09be4e", "#09bea8", "#0979be", "#091ebe", "#020202", "orange", "red")) 
+```
+Axis 1 vs 3
+```{r}
+# 1 and 3
+ggndms1_3 <- ggplot(data.scores, aes(x = NMDS2, y = NMDS3)) + 
+    geom_point(size = 2.5, aes(colour = Treatment))+ 
+    theme(axis.text.y = element_text(colour = "black", size = 10, face = "bold"), 
+    axis.text.x = element_text(colour = "black", face = "bold", size = 10), 
+    legend.text = element_text(size = 10, face ="bold", colour ="black"), 
+    legend.position = "none", 
+    axis.title.y = element_text(face = "bold", size = 10), 
+    axis.title.x = element_text(face = "bold", size = 10, colour = "black"), 
+    legend.title = element_text(size = 14, colour = "black", face = "bold"), 
+    panel.background = element_blank(), panel.border = element_rect(colour = "black", fill = NA, size = 1.2),
+    legend.key=element_blank()) + 
+    labs(x = "NMDS2", colour = "Diet") + 
+    ggtitle("B") +
+    scale_y_continuous(limits=c(-1.1, 1.1), breaks=seq(-1, 1, by = 0.5)) +
+    scale_x_continuous(limits=c(-1.1, 1.1), breaks=seq(-1, 1, by = 0.5)) +
+    scale_colour_manual(values = c("#d900e7", "#09be4e", "#09bea8", "#0979be", "#091ebe", "#020202", "orange", "red")) 
+
+```
+
+Indicator species
+```{r}
+# Make sure this is not from the joined data frames because there are values missin there
+sub_abun = data.frame(Treatment = data_2$treatment, 
+                        Rf44.0 = abun$'Rf-44.0',
+                        Rf38.6 = abun$'Rf-38.6', 
+                        Rf32.4 = abun$'Rf-32.4', 
+                        Rf23.3 = abun$'Rf-23.3', 
+                        Rf37.5 = abun$'Rf-37.5', 
+                        Rf54.4 = abun$'Rf-54.4', 
+                        Rf34.7 = abun$'Rf-34.7') 
+
+sub_pc_m = melt(sub_abun, id = "Treatment")
+relative_abun <- within(sub_pc_m, abundance <- (value)*100) %>%
+  select(-value)
+library(table1)
+table1::label(sub_abun$Treatment) <- "Life Expectancy"
+table1::table1(~ Rf44.0+Rf38.6+Rf32.4+Rf23.3+Rf37.5+Rf54.4+Rf34.7 | Treatment, data = sub_abun)
+
+
+
+relative_abun_se <- summarySE(sub_abun, measurevar="Rf44.0", groupvars=c("Treatment"), na.rm = TRUE)
+
+```
+
+
+```{r}
+bp_abun<-relative_abun %>% 
+    ggplot(aes(x = variable, y = abundance, fill = Treatment)) +
+  geom_boxplot(colour = "black", 
+               position = position_dodge(0.8), 
+               alpha = 0.7, 
+               outlier.colour = "red",
+               outlier.size = 0.5,
+               coef = 2.5) +
+  labs(x= "SSU rDNA Band locations (Rf)", y = "Relative Abundance (%)", fill = "Diet") + 
+  scale_fill_manual(values = c("#d900e7", "#09be4e", "#09bea8", "#0979be", "#091ebe", "#020202")) +
+  theme_pubr() +
+  theme(axis.text.y = element_text(colour = "black", size = 10, face = "bold"), 
+    axis.text.x = element_text(colour = "black", face = "bold", size = 10), 
+    legend.text = element_text(size = 10, face ="bold", colour ="black"), 
+    legend.position = "bottom",
+    axis.title.y = element_text(face = "bold", size = 10), 
+    axis.title.x = element_text(face = "bold", size = 10, colour = "black"), 
+    legend.title = element_text(size = 14, colour = "black", face = "bold"), 
+    panel.background = element_blank(), panel.border = element_rect(colour = "black", fill = NA, size = 1.2),
+    legend.key=element_blank()) + 
+  geom_vline(xintercept = c(1.5,2.5,3.5,4.5,5.5,6.5), colour = "grey85", size = 1.2) +
+  scale_y_continuous(limits=c(0, 60), breaks=seq(0, 60, by = 10))
+```
+
+
+
+## ANALYSIS
+```{r}
+# PERMANOVA fitting with the vegan ADONIS
+fit<-adonis(abun ~ treatment, data=data_2, permutations = 999, method = "bray")
+# Create a distance matrix using vegan to validate the NDMS
+dist.abun<-vegdist(abun.log)
+b.abun<-betadisper(dist.abun, data_2$treatment)
+a.abun<-anova(betadisper(dist.abun, data_2$treatment)) # p = 0.5657
+```
+
+```{r}
+# Unique species identification
+treatment.abun = data_2$treatment
+inv = multipatt(abun.log, treatment.abun, func = "r.g", control = how(nperm=9999))
+```
+
+
+
+
+
+

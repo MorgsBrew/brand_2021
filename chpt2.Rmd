@@ -1,0 +1,1142 @@
+---
+title: "Chapter 2"
+output:
+  html_document:
+    df_print: paged
+---
+# Readme
+This code is the combination of working chunks that were used for the completion of my phd thesis. This document should contain the necessary information to reproduce the plotting and analysis in the methods section but it is not a stand alone reproducible document. It is advised that the specific area of interest be isolated from the .Rmd file and those chunks be run accordingly.
+
+# Library
+This list is more than is required but I like to just load a complete library so unecessary distractions do not occur.
+```{r}
+library(tidyverse)
+library(nlme)
+library(workflowr)
+library(GGally)
+library(superheat)
+library(viridis)
+library(factoextra)
+library(ggalt)
+library(ggfortify)
+#library(ggbiplot)
+library(ggpubr)
+library(RColorBrewer)
+library(vegan)
+library(gplots)
+library(ggeffects)
+library(Rmisc)
+library(gridExtra)
+library(FSA)
+library(rcompanion)
+library(PMCMR)
+library(table1)
+library(tidyr)
+library(broom)
+library(officer)
+library(magrittr)
+library(dplyr)
+library(car)
+library(FactoMineR)
+library(indicspecies)
+library(workflowr)
+```
+# Methods
+in this section i am leaving code chuncks that will reproduce the graphics used in materials and methods of my phd thesis. The data for each plot can be ma
+
+## Data
+The data are loaded are .Rdata objects from the /data folder
+
+### Temperature
+```{r}
+load("data/hermanus.history.Rdata")
+```
+
+### Ulva Spinning for removal of excess water
+```{r}
+load("data/protocol1.se.Rdata")
+```
+
+### Feeding rations visualised 
+```{r}
+load("data/consumptionratioNEW.Rdata")
+```
+
+### LME models and overall growth
+```{r}
+load("/Users/morganbrand/Desktop/PhD/r/data/Rdata/ulva.Rdata")
+```
+```{r}
+load("/Users/morganbrand/Desktop/PhD/r/data/Rdata/kelp.Rdata")
+```
+
+
+## Plotting
+The code chunks below were used for the creation of the various plts
+
+### Temperature
+```{r, error=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
+hermanustemp <- 
+  hermanus.history %>%
+  na.omit()
+
+h_temp <- 
+  ggplot(hermanustemp, aes(x=month, y=temp)) + 
+  geom_boxplot(outlier.colour = "red") + 
+  stat_summary(fun.y="mean", geom="point", shape=23, size=3, fill="white") +
+  xlab("Month") +
+  ylab(expression(paste("Temperature (",degree,"C)"))) +
+  scale_y_continuous(limits=c(0,24), breaks=seq(0,24, by = 4)) +
+  geom_hline(yintercept=mean(hermanustemp$temp), 
+             linetype="dashed", colour = "blue") + 
+  theme_classic()
+```
+
+### Ulva Spinning
+```{r, error=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
+protocol1<-
+  ggplot(data=protocol1.se, aes(x=rotations, y=change)) + 
+  geom_errorbar(aes(ymin=change-se, ymax=change+se), width=.5) +
+  geom_point() +
+  geom_line() +
+  theme_classic() +
+  scale_x_continuous(limits=c(0,80), breaks=seq(0,80, by = 10)) +
+  xlab("Number of rotations") +
+  ylab("Weight loss of wet Ulva (%)")
+```
+
+### Feeding rations
+
+```{r, error=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
+# renaming the treatments in the ros
+revalue(con$Diet, c("A" = "100A")) -> con$Diet
+revalue(con$Diet, c("U" = "100U")) -> con$Diet
+
+ratios <-
+  ggplot(data = con, aes(x=Diet, y = Contribution, fill = Feed)) +
+  geom_bar(stat="identity", position = "stack") +
+  scale_fill_manual(values = c("mediumpurple","limegreen")) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) +
+  theme_classic() +
+  xlab("Feeding regime") +
+  ylab("Percentage inclusion (%)") 
+
+```
+
+### LME Methods
+```{r, error=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
+dat<-ulva
+#setting madel parameters as to not run into any convergance issues
+lmc <- lmeControl(niterEM = 100200, msMaxIter = 100200) 
+
+dat$yy<-log(dat$Weight)
+M7<-lme(Weight ~ Number.of.days * Treatment, 
+         random =~ 1 + Number.of.days | Basket, 
+         control = lmc, data = dat)
+M7l<-lme(yy ~ Number.of.days * Treatment, 
+        random =~ 1 + Number.of.days | Basket, 
+        control = lmc, data = dat)
+
+# Setting the variance structure
+vf2 <- varIdent(form =~ 1 | Number.of.days)
+# Using the new variance sturcture
+M18.v<-lme(yy ~ Number.of.days * Treatment, 
+         random =~ 1 + Number.of.days | Basket, 
+         control = lmc, data = dat, 
+         weights = vf2)
+# Plotting the residuals
+plot.M7<-plot(M7, main = "A")
+plot.M7l<-plot(M7l, main = "B")
+plot.M18.v<-plot(M18.v, main = "C")
+
+#grid.arrange(plot.M7, plot.M7l, plot.M18.v, ncol = 3)
+```
+
+```{r, echo=FALSE, error=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
+# tried using ggplot but something doesnt look right with the way residuals are plotted
+# M7
+#df.M7 <- augment(M7)
+#gg.M7 <- 
+#  ggplot(df.M7, aes(x = .fitted, y = .resid)) + 
+#  geom_point() +
+#  theme_classic() +
+#  xlab("Fitted values") +
+#  ylab("Standardized residuals") +
+#  ggtitle("A")
+
+# M7l
+#df.M7l <- augment(M7l)
+#gg.M7l <- 
+#  ggplot(df.M7l, aes(x = .fitted, y = .resid)) + 
+#  geom_point() +
+#  theme_classic() +
+#  xlab("Fitted values") +
+#  ylab("") +
+#  ggtitle("B")
+
+# M18.v
+#df.M18.v <- augment(M18.v)
+#gg.M18.v <- 
+#  ggplot(df.M18.v, aes(x = .fitted, y = .resid)) + 
+#  geom_point() +
+#  theme_classic() +
+#  xlab("Fitted values") +
+#  ylab("") +
+#  ggtitle("C")
+
+```
+
+# Results
+## Data
+### Consumption
+#### LOAD
+```{r}
+load("/Users/morganbrand/Desktop/PhD/r/data/Rdata/con_each.Rdata")
+#check this link http://sia.webpopix.org/nlme.html
+```
+#### PLOT
+```{r, error=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
+# renaming the treatments in the rows
+revalue(con_each$diet, c("1" = "100A")) -> con_each$diet
+revalue(con_each$diet, c("5" = "100U")) -> con_each$diet
+revalue(con_each$diet, c("2" = "75A25U")) -> con_each$diet
+revalue(con_each$diet, c("3" = "50A50U")) -> con_each$diet
+revalue(con_each$diet, c("4" = "25A75U")) -> con_each$diet
+
+#tot.con.se<-summarySE(cf.u.if, measurevar="meancf",
+                      
+tot.con <- 
+  ggplot(data = con_each, aes(x = diet, y = consumption, fill = Feed)) +
+  geom_bar(stat = "Identity") +
+  scale_y_continuous(limits=c(0,0.5), breaks=seq(0,0.5, by = 0.1)) +
+  scale_fill_manual(values = c("mediumpurple","limegreen")) +
+  annotate("text", x=1, y=0.2215, label="a", family="serif",
+           colour="black", size=3) +
+  annotate("text", x=2, y=0.3963, label="b", family="serif",
+           colour="black", size=3) +
+  annotate("text", x=3, y=0.3259, label="ab", family="serif",
+           colour="black", size=3) +
+  annotate("text", x=4, y=0.27611, label="ab", family="serif",
+           colour="black", size=3) +
+  annotate("text", x=5, y=0.2241, label="a", family="serif",
+           colour="black", size=3) +
+  labs(x="Feeding regime", 
+       y=expression(Daily~feed~consumption~~"(% BW."*day^"-1"*")")) +
+  theme_classic() +
+  theme(legend.position="right")
+```
+#### ANALYSIS
+```{r , error=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
+# con_each_r is the data for each and will need to be filtered for each test
+# con_tot_r is for the total consumption
+
+
+# Total consumption
+a.tot <- aov(total ~ diet, data = con_tot_r)
+#summary(a.tot)
+#            Df  Sum Sq  Mean Sq F value Pr(>F)  
+#diet         4 0.06587 0.016468   4.034 0.0335 *
+#Residuals   10 0.04082 0.004082  
+TukeyHSD(a.tot)
+#$diet
+#            diff          lwr           upr     p adj
+#2-1  0.174825482  0.003141335  0.3465096286 0.0455369
+
+#TESTING ASSUMPTIONS
+# Bartlett Test of Homogeneity of Variances
+bartlett.test(total ~ diet, data = con_tot_r) # p=0.2234
+
+#Generate residual and predicted values
+resids <- residuals(a.tot)
+hist(resids)
+
+#Perform a Shapiro-Wilk test for normality of residuals
+shapiro.test(resids) # p=0.6569
+
+```
+
+### Jocobs index
+#### LOAD
+```{r}
+load("/Users/morganbrand/Desktop/PhD/r/data/Rdata/summary_con_abfeed.Rdata")
+load("/Users/morganbrand/Desktop/PhD/r/data/Rdata/summary_con_ulva.Rdata")
+load("/Users/morganbrand/Desktop/PhD/r/data/Rdata/summary_q.Rdata")
+```
+#### PLOT
+```{r, error=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
+# PLOTTIN ABFEED CONSUMPTION
+# renaming the treatments in the ros
+revalue(summary_con_abfeed$diet, c("1" = "100A")) -> summary_con_abfeed$diet
+revalue(summary_con_abfeed$diet, c("5" = "100U")) -> summary_con_abfeed$diet
+revalue(summary_con_abfeed$diet, c("2" = "75A25U")) -> summary_con_abfeed$diet
+revalue(summary_con_abfeed$diet, c("3" = "50A50U")) -> summary_con_abfeed$diet
+revalue(summary_con_abfeed$diet, c("4" = "25A75U")) -> summary_con_abfeed$diet
+#summary_con_abfeed
+summary_con_abfeed <- summary_con_abfeed %>% 
+  mutate(se = replace(se, se==0, NA))
+
+ac<-ggplot(data = summary_con_abfeed, aes(x = diet, y = consumption, fill = Feed)) +
+  geom_bar(aes(fill = diet), stat = "identity") +
+  geom_errorbar(aes(ymin=consumption-se, ymax=consumption+se), width=.1) +
+  scale_fill_brewer(palette="Purples") +
+  #annotate("text", x=1, y=(abfcon.se$abfcon[abfcon.se$Diet == "Abfeed Only"]) + 0.02, label="ab", family="serif",
+  #         colour="black", size=3) +
+  annotate("text", x=2, y=0.38, label="0.36", family="serif",
+           colour="black", size=5) +
+  annotate("text", x=3, y=0.31, label="1.46", family="serif",
+           colour="black", size=5) +
+  annotate("text", x=4, y=0.21, label="6.33", family="serif",
+           colour="black", size=5) +
+  scale_y_continuous(limits=c(0,0.5), breaks=seq(0,0.5, by = 0.1)) +
+  labs(x="Feeding regime", 
+       y=expression(Consumption~~"(% BW."*day^"-1"*")")) +
+  theme_classic() +
+  ggtitle("A - Abfeed") +
+  theme(plot.title=element_text(size=rel(1.5), 
+                                lineheight=.9, 
+                                family="Times",
+                                face="bold", 
+                                colour="Black", 
+                                hjust = 0)) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) +
+  theme(legend.position="none")
+```
+
+```{r, error=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
+# renaming the treatments in the ros
+revalue(summary_con_ulva$diet, c("1" = "100A")) -> summary_con_ulva$diet
+revalue(summary_con_ulva$diet, c("5" = "100U")) -> summary_con_ulva$diet
+revalue(summary_con_ulva$diet, c("2" = "75A25U")) -> summary_con_ulva$diet
+revalue(summary_con_ulva$diet, c("3" = "50A50U")) -> summary_con_ulva$diet
+revalue(summary_con_ulva$diet, c("4" = "25A75U")) -> summary_con_ulva$diet
+#summary_con_abfeed
+summary_con_ulva <- summary_con_ulva %>% 
+  mutate(se = replace(se, se==0, NA))
+
+uc <- ggplot(data = summary_con_ulva, aes(x = diet, y = consumption, fill = Feed)) +
+  geom_bar(aes(fill = diet), stat = "identity") +
+  geom_errorbar(aes(ymin=consumption-se, ymax=consumption+se), width=.1) +
+  scale_fill_brewer(palette="Greens") +
+  #annotate("text", x=1.2, y=(abfcon.se$abfcon[abfcon.se$Diet == "Abfeed Only"]) + 0.02, label="ab", family="serif",
+  #         colour="black", size=3) +
+  annotate("text", x=2, y=0.19, label="1.09", family="serif",
+           colour="black", size=5) +
+  annotate("text", x=3, y=0.2, label="0.17", family="serif",
+           colour="black", size=5) +
+  annotate("text", x=4, y=0.24, label="0.07", family="serif",
+           colour="black", size=5) +
+  scale_y_continuous(limits=c(0,0.5), breaks=seq(0,0.5, by = 0.1)) +
+  labs(x="Feeding regime", 
+       y="") +
+  theme_classic() +
+  ggtitle("B - Ulva") +
+  theme(plot.title=element_text(size=rel(1.5), 
+                                lineheight=.9, 
+                                family="Times",
+                                face="bold", 
+                                colour="Black", 
+                                hjust = 0)) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) +
+  theme(legend.position="none")
+
+```
+#### ANALYSIS
+
+### Farm water temperature
+#### LOAD
+```{r}
+load("/Users/morganbrand/Desktop/PhD/r/data/Rdata/farm.temperature.Rdata")
+```
+#### PLOT
+```{r, error=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
+# Specify breaks as a Date vector
+datebreaks <- seq(as.Date("2011-08-20"), as.Date("2012-08-20"), by="1 month")
+#name the plot
+farm_temp <-
+  ggplot(data=farm.temperature, aes(x = Date, y = Temperature)) + 
+  geom_vline(aes(xintercept = as.Date(as.POSIXct("2011-08-14"))), col = 
+               "black") +
+  geom_vline(aes(xintercept = as.Date(as.POSIXct("2011-12-07"))), col = 
+               "black") +
+  geom_vline(aes(xintercept = as.Date(as.POSIXct("2012-03-27"))), col = 
+               "black") +
+  geom_vline(aes(xintercept = as.Date(as.POSIXct("2012-08-13"))), col = 
+               "black") +
+  #geom_rect(aes(xmin=farm.temperature$Date[1], xmax=farm.temperature$Date[119], 
+  #              ymin=-Inf, ymax=Inf),
+  #          fill="azure1",
+  #          alpha=0.1) +
+  #geom_rect(aes(xmin=farm.temperature$Date[119], xmax=farm.temperature$Date[227], 
+  #              ymin=-Inf, ymax=Inf),
+  #          fill="white",
+  #          alpha=0.1) +
+  #geom_rect(aes(xmin=farm.temperature$Date[227], xmax=farm.temperature$Date[366], 
+  #              ymin=-Inf, ymax=Inf),
+  #          fill="azure1",
+  #          alpha=0.1) +
+  annotate("text", x=as.Date('2011-10-10','%Y-%m-%d'), y=5, label="Period 1",
+  family="Times New Roman",
+           colour="black", size=6) +
+  annotate("text", x=as.Date('2012-02-01','%Y-%m-%d'), y=5, label="Period 2", family="Times New Roman",
+           colour="black", size=6) +
+  annotate("text", x=as.Date('2012-06-01','%Y-%m-%d'), y=5, label="Period 3", family="Times New Roman",
+           colour="black", size=6) +
+  geom_line(colour = "grey") + xlab("Date") + ylab("Temperature") + 
+  # add a loess smoother
+  stat_smooth(span = 0.15, geom = "smooth", method = "loess", 
+              color = "black", se = TRUE) + 
+  scale_x_date(breaks=datebreaks, labels=date_format("%b")) +
+  geom_hline(aes(yintercept = max(farm.temperature$Temperature)), 
+             linetype="dashed", colour = "red") +
+  geom_hline(aes(yintercept = mean(farm.temperature$Temperature)), 
+             linetype="dashed", colour = "black") +
+  geom_hline(aes(yintercept = min(farm.temperature$Temperature)), 
+             linetype="dashed", colour = "blue") +
+  scale_y_continuous(limits=c(0,22), breaks=seq(0,22, by = 2)) +
+  theme_classic() +
+ # geom_vline(aes(xintercept = as.Date('2011-08-14','%Y-%m-%d'), 
+#                 colour = "grey")) +
+#  geom_vline(aes(xintercept = as.Date('2011-12-07','%Y-%m-%d'),
+#                 colour = "grey")) +
+#  geom_vline(aes(xintercept = as.Date('2012-03-27','%Y-%m-%d'),
+#                 colour = "grey")) +
+#  geom_vline(aes(xintercept = as.Date('2012-08-13','%Y-%m-%d'),
+#                 colour = "grey")) +
+  xlab("Month (2011 - 2012)") +
+  ylab(expression(paste("Temperature (",degree,"C)")))
+farm_temp
+```
+
+### SGR
+#### LOAD
+```{r}
+load("/Users/morganbrand/Desktop/PhD/r/data/Rdata/sgr.l.Rdata")
+load("/Users/morganbrand/Desktop/PhD/r/data/Rdata/sgr.aov.Rdata")
+load("/Users/morganbrand/Desktop/PhD/r/data/Rdata/pt.sgr.Rdata")
+load("/Users/morganbrand/Desktop/PhD/r/data/Rdata/sgr.l.k.Rdata")
+load("/Users/morganbrand/Desktop/PhD/r/data/Rdata/sgr.aov.k.Rdata")
+load("/Users/morganbrand/Desktop/PhD/r/data/Rdata/pt.sgr.k.Rdata")
+```
+#### PLOT 
+##### Ulva
+```{r, error=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
+pt.se<-summarySE(pt.sgr, measurevar="mean.SGR", groupvars=c("Treatment"), na.rm = TRUE)
+
+sgr.u <- 
+  ggplot(data=pt.se, aes(x=Treatment, y=mean.SGR, colour = Treatment)) + 
+  geom_errorbar(aes(ymin=mean.SGR-se, ymax=mean.SGR+se), width=.1) +
+  geom_point() +
+  scale_y_continuous(limits=c(0,0.3), breaks=seq(0,0.3, by = 0.05)) +
+  labs(x="", 
+       y=expression(SGR~~"(% BW."*day^"-1"*")")) +
+  theme_classic() +
+  scale_colour_manual(values = c("mediumpurple", "greenyellow", "springgreen", "limegreen", "chartreuse4", "darkolivegreen")) +
+  theme(legend.position="none") +
+  ggtitle("A") + 
+    theme(plot.title=element_text(size=rel(1.5), lineheight=.9, family="Times",
+         face="bold", colour="Black", hjust = 0),
+          axis.text.x = element_text(angle = 90, vjust = 0.5))
+```
+
+##### Kelp
+```{r, error=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
+pt.se.k<-summarySE(pt.sgr.k, measurevar="mean.SGR", groupvars=c("Treatment"), na.rm = TRUE)
+
+sgr.k <-
+  ggplot(data=pt.se.k, aes(x=Treatment, y=mean.SGR, colour = Treatment)) + 
+  geom_errorbar(aes(ymin=mean.SGR-se, ymax=mean.SGR+se), width=.1) +
+  geom_point() +
+  scale_y_continuous(limits=c(0,0.3), breaks=seq(0,0.3, by = 0.05)) +
+  labs(x="",
+       y="") +
+  theme_classic() +
+  scale_colour_manual(values = c("mediumpurple", "tan4", "brown", "darkorange3", "goldenrod3", "gold1")) +
+  theme(legend.position="none") +
+  ggtitle("B") + 
+    theme(plot.title=element_text(size=rel(1.5), lineheight=.9, family="Times",
+         face="bold", colour="Black", hjust = 0),
+          axis.text.x = element_text(angle = 90, vjust = 0.5))
+```
+#### ANALYSIS
+```{r, error=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
+
+# Setting up each set for Ulva
+p1<- sgr.aov %>%
+  filter(Time == "Period 1")
+p2<- sgr.aov %>%
+  filter(Time == "Period 2")
+p3<- sgr.aov %>%
+  filter(Time == "Period 3")
+pt.sgr<- sgr.aov %>%
+  filter(Time == "Total")
+
+# ANOVA
+a.p1<-aov(mean.SGR ~ Treatment, data = p1)
+a.p2<-aov(mean.SGR ~ Treatment, data = p2)
+a.p3<-aov(mean.SGR ~ Treatment, data = p3)
+a.pt<-aov(mean.SGR ~ Treatment, data = pt.sgr)
+# Summary and test
+# Period 1
+summary(a.p1)
+TukeyHSD(a.p1)
+hist(resid(a.p1))
+bartlett.test(mean.SGR ~ Treatment, data = p1) # p=0.4624
+leveneTest(mean.SGR~Treatment,  data = p1) #p=0.8297
+# Period 2
+summary(a.p2)
+TukeyHSD(a.p2)
+hist(resid(a.p2))
+bartlett.test(mean.SGR ~ Treatment, data = p2) # p=0.4102 
+leveneTest(mean.SGR~Treatment,  data = p2) #p=0.6937
+# Period 3
+summary(a.p3)
+TukeyHSD(a.p3)
+hist(resid(a.p3))
+bartlett.test(mean.SGR ~ Treatment, data = p3) # p=0.4466
+leveneTest(mean.SGR~Treatment,  data = p3) #p=0.8898
+
+# Total
+summary(a.pt)
+TukeyHSD(a.pt)
+hist(resid(a.pt))
+bartlett.test(mean.SGR ~ Treatment, data = pt.sgr) # p=0.7084
+leveneTest(mean.SGR~Treatment,  data = pt.sgr) #p=0.7855
+
+
+# Setting up each period set for kelp
+p1.k<- sgr.aov.k %>%
+  filter(Time == "Period 1")
+p2.k<- sgr.aov.k %>%
+  filter(Time == "Period 2")
+p3.k<- sgr.aov.k %>%
+  filter(Time == "Period 3")
+pt.sgr.k<- sgr.aov.k %>%
+  filter(Time == "Total")
+
+# ANOVA
+a.p1.k<-aov(mean.SGR ~ Treatment, data = p1.k)
+a.p2.k<-aov(mean.SGR ~ Treatment, data = p2.k)
+a.p3.k<-aov(mean.SGR ~ Treatment, data = p3.k)
+a.pt.k<-aov(mean.SGR ~ Treatment, data = pt.sgr.k)
+# Summary and test
+
+# Period 1
+summary(a.p1.k)
+TukeyHSD(a.p1.k)
+hist(resid(a.p1.k))
+bartlett.test(mean.SGR ~ Treatment, data = p1.k) # p=0.4624
+leveneTest(mean.SGR~Treatment,  data = p1.k) #p=0.9431
+# Period 2
+summary(a.p2.k)
+TukeyHSD(a.p2.k)
+hist(resid(a.p2.k))
+bartlett.test(mean.SGR ~ Treatment, data = p2.k) # p=0.4074 
+leveneTest(mean.SGR~Treatment,  data = p2.k) #p=0.6627
+# Period 3
+summary(a.p3.k)
+TukeyHSD(a.p3.k)
+hist(resid(a.p3.k))
+bartlett.test(mean.SGR ~ Treatment, data = p3.k) # p=0.3983
+leveneTest(mean.SGR~Treatment,  data = p3.k) #p=0.8185
+
+# Total
+summary(a.pt.k)
+TukeyHSD(a.pt.k)
+hist(resid(a.pt.k))
+bartlett.test(mean.SGR ~ Treatment, data = pt.sgr.k) # p=0.5968
+leveneTest(mean.SGR~Treatment,  data = pt.sgr.k) #p=0.8486
+```
+
+```{r, error=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
+aov.sgr<-aov(mean.SGR ~ Time * Treatment, data = sgr.aov)
+#summary(aov.sgr)
+#TukeyHSD(aov.sgr)
+#tidy(aov.cf)
+## Extract fixed effects table only and make it pretty
+table<-tidy(aov.sgr)
+kable(table, align = "c", 
+    caption = "Summary table for the two-way ANOVA perfromed on the specific growth rate of abalone. A significant effect of time was evident (p < 0.0001) with no treatment effect.")
+```
+
+### MISL
+#### LOAD
+```{r}
+# Ulva
+load("/Users/morganbrand/Desktop/PhD/r/data/Rdata/misl.u.only.Rdata")
+load("/Users/morganbrand/Desktop/PhD/r/data/Rdata/disl.l.Rdata")
+load("/Users/morganbrand/Desktop/PhD/r/data/Rdata/pt.misl.Rdata")
+# Kelp
+load("/Users/morganbrand/Desktop/PhD/r/data/Rdata/misl.k.only.Rdata")
+load("/Users/morganbrand/Desktop/PhD/r/data/Rdata/disl.l.k.Rdata")
+load("/Users/morganbrand/Desktop/PhD/r/data/Rdata/pt.misl.k.Rdata")
+```
+#### PLOT
+##### Ulva
+```{r, error=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
+pt.misl.se<-summarySE(pt.misl, measurevar="value", groupvars=c("Treatment"), na.rm = TRUE)
+revalue(pt.misl.se$Treatment, c("1" = "Control")) -> pt.misl.se$Treatment
+revalue(pt.misl.se$Treatment, c("2" = "100AU")) -> pt.misl.se$Treatment
+revalue(pt.misl.se$Treatment, c("3" = "80AU")) -> pt.misl.se$Treatment
+revalue(pt.misl.se$Treatment, c("4" = "70AU")) -> pt.misl.se$Treatment
+revalue(pt.misl.se$Treatment, c("5" = "60AU")) -> pt.misl.se$Treatment
+revalue(pt.misl.se$Treatment, c("6" = "40AU")) -> pt.misl.se$Treatment
+
+misl.u <-
+  ggplot(data=pt.misl.se, aes(x=Treatment, y=value, colour = Treatment)) + 
+  geom_errorbar(aes(ymin=value-se, ymax=value+se), width=.1) +
+  geom_point() +
+  scale_y_continuous(limits=c(0,2.5), breaks=seq(0,2.5, by = 0.5)) +
+  labs(x="", 
+       y="MISL (mm)") +
+  theme_classic() +
+  scale_colour_manual(values = c("mediumpurple", "greenyellow", "springgreen", "limegreen", "chartreuse4", "darkolivegreen")) +
+  theme(legend.position="none") +
+  ggtitle("A") + 
+    theme(plot.title=element_text(size=rel(1.5), lineheight=.9, family="Times",
+          face="bold", colour="Black", hjust = 0),
+          axis.text.x = element_text(angle = 90, vjust = 0.5))
+
+```
+
+##### Kelp
+```{r, error=FALSE, message=FALSE, warning=FALSE, cache=TRUE}
+
+pt.misl.se.k<-summarySE(pt.misl.k, measurevar="value", groupvars=c("Treatment"), na.rm = TRUE)
+revalue(pt.misl.se.k$Treatment, c("1" = "Control")) -> pt.misl.se.k$Treatment
+revalue(pt.misl.se.k$Treatment, c("2" = "100AK")) -> pt.misl.se.k$Treatment
+revalue(pt.misl.se.k$Treatment, c("3" = "80AK")) -> pt.misl.se.k$Treatment
+revalue(pt.misl.se.k$Treatment, c("4" = "70AK")) -> pt.misl.se.k$Treatment
+revalue(pt.misl.se.k$Treatment, c("5" = "60AK")) -> pt.misl.se.k$Treatment
+revalue(pt.misl.se.k$Treatment, c("6" = "40AK")) -> pt.misl.se.k$Treatment
+
+misl.k <-
+  ggplot(data=pt.misl.se.k, aes(x=Treatment, y=value, colour = Treatment)) + 
+  geom_errorbar(aes(ymin=value-se, ymax=value+se), width=.1) +
+  geom_point() +
+  scale_y_continuous(limits=c(0,2.5), breaks=seq(0,2.5, by = 0.5)) +
+  labs(x="", 
+       y="") +
+  theme_classic() +
+  scale_colour_manual(values = c("mediumpurple", "tan4", "brown", "darkorange3", "goldenrod3", "gold1")) +
+  theme(legend.position="none") +
+  ggtitle("B") + 
+    theme(plot.title=element_text(size=rel(1.5), lineheight=.9, family="Times",
+          face="bold", colour="Black", hjust = 0),
+          axis.text.x = element_text(angle = 90, vjust = 0.5))
+```
+#### ANALYSIS
+```{r, error=FALSE, message=FALSE, warning=FALSE, cache=TRUE, tidy=FALSE}
+# Calculate the MISL for the Ulva data first
+
+#Renaming the row names within a coloumn
+misl.aov<-misl.u.only
+colnames(misl.aov)[3] <- "Time"
+colnames(misl.aov)[4] <- "mean.MISL"
+#names(misl.aov)
+
+
+# renaming the treatments in the ros
+revalue(misl.aov$Treatment, c("1" = "Control")) -> misl.aov$Treatment
+revalue(misl.aov$Treatment, c("2" = "100AU")) -> misl.aov$Treatment
+revalue(misl.aov$Treatment, c("3" = "80AU")) -> misl.aov$Treatment
+revalue(misl.aov$Treatment, c("4" = "70AU")) -> misl.aov$Treatment
+revalue(misl.aov$Treatment, c("5" = "60AU")) -> misl.aov$Treatment
+revalue(misl.aov$Treatment, c("6" = "40AU")) -> misl.aov$Treatment
+#str(misl.aov)
+
+# Setting up each set
+s.p1<- misl.aov %>%
+  filter(Time == "Period 1")
+s.p2<- misl.aov %>%
+  filter(Time == "Period 2")
+s.p3<- misl.aov %>%
+  filter(Time == "Period 3")
+pt.misl<- disl.l %>%
+  filter(variable == "dislT")
+
+# ANOVA
+s.a.p1<-aov(mean.MISL ~ Treatment, data = s.p1)
+s.a.p2<-aov(mean.MISL ~ Treatment, data = s.p2)
+s.a.p3<-aov(mean.MISL ~ Treatment, data = s.p3)
+s.a.pt<-aov(value ~ Treatment, data = pt.misl)
+# Summary and test
+
+# Period 1
+summary(s.a.p1)
+TukeyHSD(s.a.p1)
+hist(resid(s.a.p1))
+bartlett.test(mean.MISL ~ Treatment, data = s.p1) # p=0.6557
+leveneTest(mean.MISL~Treatment,  data = s.p1) #p=0.8393
+# Period 2
+summary(s.a.p2)
+TukeyHSD(s.a.p2)
+hist(resid(s.a.p2))
+bartlett.test(mean.MISL ~ Treatment, data = s.p2) # p=0.008103 FAILED
+leveneTest(mean.MISL~Treatment,  data = s.p2) #p=0.8393
+kruskal.test(mean.MISL ~ Treatment, data= s.p2)
+# Period 3
+summary(s.a.p3)
+TukeyHSD(s.a.p3)
+hist(resid(s.a.p3))
+bartlett.test(mean.MISL ~ Treatment, data = s.p3) # p=0.6302
+leveneTest(mean.MISL~Treatment,  data = s.p3) #p=0.8863
+
+# Total
+summary(s.a.pt)
+TukeyHSD(s.a.pt)
+hist(resid(s.a.pt))
+bartlett.test(value ~ Treatment, data = pt.misl) # p=0.1866
+leveneTest(value~Treatment,  data = pt.misl) #p=0.8393
+
+
+# Calculate the MISL for the KELP Data
+
+#Renaming the row names within a coloumn
+misl.aov.k<-misl.k.only
+colnames(misl.aov.k)[3] <- "Time"
+colnames(misl.aov.k)[4] <- "mean.MISL"
+#names(misl.aov)
+
+
+# renaming the treatments in the ros
+revalue(misl.aov.k$Treatment, c("1" = "Control")) -> misl.aov.k$Treatment
+revalue(misl.aov.k$Treatment, c("2" = "100AK")) -> misl.aov.k$Treatment
+revalue(misl.aov.k$Treatment, c("3" = "80AK")) -> misl.aov.k$Treatment
+revalue(misl.aov.k$Treatment, c("4" = "70AK")) -> misl.aov.k$Treatment
+revalue(misl.aov.k$Treatment, c("5" = "60AK")) -> misl.aov.k$Treatment
+revalue(misl.aov.k$Treatment, c("6" = "40AK")) -> misl.aov.k$Treatment
+#str(misl.aov)
+
+# Setting up each set
+s.p1.k<- misl.aov.k %>%
+  filter(Time == "Period 1")
+s.p2.k<- misl.aov.k %>%
+  filter(Time == "Period 2")
+s.p3.k<- misl.aov.k %>%
+  filter(Time == "Period 3")
+s.pt.misl.k<- disl.l.k %>%
+  filter(variable == "dislT")
+
+# ANOVA
+s.a.p1.k<-aov(mean.MISL ~ Treatment, data = s.p1.k)
+s.a.p2.k<-aov(mean.MISL ~ Treatment, data = s.p2.k)
+s.a.p3.k<-aov(mean.MISL ~ Treatment, data = s.p3.k)
+s.a.pt.k<-aov(value ~ Treatment, data = pt.misl.k)
+# Summary and test
+
+# Period 1
+summary(s.a.p1.k)
+TukeyHSD(s.a.p1.k)
+hist(resid(s.a.p1.k))
+bartlett.test(mean.MISL ~ Treatment, data = s.p1.k) # p=0.6557
+leveneTest(mean.MISL~Treatment,  data = s.p1.k) #p=0.8393
+# Period 2
+summary(s.a.p2.k)
+TukeyHSD(s.a.p2.k)
+hist(resid(s.a.p2.k))
+bartlett.test(mean.MISL ~ Treatment, data = s.p2.k) # p=0.008103 FAILED
+leveneTest(mean.MISL~Treatment,  data = s.p2.k) #p=0.8393
+kruskal.test(mean.MISL ~ Treatment, data=s.p2.k)
+# Period 3
+summary(s.a.p3.k)
+TukeyHSD(s.a.p3.k)
+hist(resid(s.a.p3.k))
+bartlett.test(mean.MISL ~ Treatment, data = s.p3.k) # p=0.6302
+leveneTest(mean.MISL~Treatment,  data = s.p3.k) #p=0.8863
+
+# Total
+summary(s.a.pt.k)
+TukeyHSD(s.a.pt.k)
+hist(resid(s.a.pt.k))
+bartlett.test(value ~ Treatment, data = pt.misl.k) # p=0.1866
+leveneTest(value~Treatment,  data = pt.misl.k) #p=0.8393
+
+#aov.ddd<-aov(mean.MISL ~ Treatment, data = ddd)
+#summary(a.pt)
+#TukeyHSD(aov.ddd)
+#aov.misl<-aov(mean.MISL ~ Treatment * Time, data = misl.aov)
+#summary(aov.misl)
+#TukeyHSD(aov.misl)
+#tidy(aov.misl)
+## Extract fixed effects table only and make it pretty
+#table<-tidy(aov.misl)
+#kable(table, align = "c", 
+#    caption = "Summary table for the two-way ANOVA perfromed on the specific growth rate of abalone. A significant effect of time was #evident (p < 0.0001) with no treatment effect.")
+```
+
+### Condition Factor
+#### LOAD
+```{r}
+load("/Users/morganbrand/Desktop/PhD/r/data/Rdata/ulva.cf.aov.Rdata")
+load("/Users/morganbrand/Desktop/PhD/r/data/Rdata/cf.u.if.Rdata")
+
+load("/Users/morganbrand/Desktop/PhD/r/data/Rdata/kelp.cf.aov.Rdata")
+load("/Users/morganbrand/Desktop/PhD/r/data/Rdata/cf.k.if.Rdata")
+```
+#### PLOT
+##### Ulva
+```{r, error=FALSE, message=FALSE, warning=FALSE, cache=TRUE, tidy=FALSE}
+cf.u.if.se<-summarySE(cf.u.if, measurevar="meancf", groupvars=c("Treatment", "Period"), na.rm = TRUE)
+revalue(cf.u.if.se$Treatment, c("1" = "Control")) -> cf.u.if.se$Treatment
+revalue(cf.u.if.se$Treatment, c("2" = "100AU")) -> cf.u.if.se$Treatment
+revalue(cf.u.if.se$Treatment, c("3" = "80AU")) -> cf.u.if.se$Treatment
+revalue(cf.u.if.se$Treatment, c("4" = "70AU")) -> cf.u.if.se$Treatment
+revalue(cf.u.if.se$Treatment, c("5" = "60AU")) -> cf.u.if.se$Treatment
+revalue(cf.u.if.se$Treatment, c("6" = "40AU")) -> cf.u.if.se$Treatment
+revalue(cf.u.if.se$Period, c("0" = "Initial")) -> cf.u.if.se$Period
+revalue(cf.u.if.se$Period, c("366" = "Final")) -> cf.u.if.se$Period
+
+#plot
+ulva.cf.u<-ggplot(data=cf.u.if.se, aes(x=Treatment, y=meancf, colour = Treatment)) + 
+  geom_errorbar(aes(ymin=meancf-se, ymax=meancf+se), width=.1) +
+  geom_point() +
+  scale_y_continuous(limits=c(0.95,1.20), breaks=seq(0.95,1.20, by = 0.05)) +
+  geom_hline(aes(yintercept=1), linetype="dashed", colour = "red") +
+  xlab("") +
+  ylab("Conditoin Factor") +
+  facet_wrap( ~ Period, ncol = 1) +
+  theme_classic() +
+  theme(legend.position="none") +
+  scale_colour_manual(values = c("mediumpurple", "greenyellow", "springgreen", "limegreen", "chartreuse4", "darkolivegreen")) +
+  ggtitle("A") + 
+    theme(plot.title=element_text(size=rel(1.5), lineheight=.9, family="Times",
+          face="bold", colour="Black", hjust = 0),
+          axis.text.x = element_text(angle = 90, vjust = 0.5))
+```
+
+##### Kelp
+```{r, error=FALSE, message=FALSE, warning=FALSE, cache=TRUE, tidy=FALSE}
+cf.k.if.se<-summarySE(cf.k.if, measurevar="meancf", groupvars=c("Treatment", "Period"), na.rm = TRUE)
+revalue(cf.k.if.se$Treatment, c("1" = "Control")) -> cf.k.if.se$Treatment
+revalue(cf.k.if.se$Treatment, c("2" = "100AU")) -> cf.k.if.se$Treatment
+revalue(cf.k.if.se$Treatment, c("3" = "80AU")) -> cf.k.if.se$Treatment
+revalue(cf.k.if.se$Treatment, c("4" = "70AU")) -> cf.k.if.se$Treatment
+revalue(cf.k.if.se$Treatment, c("5" = "60AU")) -> cf.k.if.se$Treatment
+revalue(cf.k.if.se$Treatment, c("6" = "40AU")) -> cf.k.if.se$Treatment
+revalue(cf.k.if.se$Period, c("0" = "Initial")) -> cf.k.if.se$Period
+revalue(cf.k.if.se$Period, c("366" = "Final")) -> cf.k.if.se$Period
+
+# plot
+ulva.cf.k<-ggplot(data=cf.k.if.se, aes(x=Treatment, y=meancf, colour = Treatment)) + 
+  geom_errorbar(aes(ymin=meancf-se, ymax=meancf+se), width=.1) +
+  geom_point() +
+  scale_y_continuous(limits=c(0.95,1.20), breaks=seq(0.95,1.20, by = 0.05)) +
+  geom_hline(aes(yintercept=1), linetype="dashed", colour = "red") +
+  xlab("") +
+  ylab("") +
+  facet_wrap( ~ Period, ncol = 1) +
+  theme_classic() +
+  theme(legend.position="none") +
+  scale_colour_manual(values = c("mediumpurple", "tan4", "brown", "darkorange3", "goldenrod3", "gold1")) +
+  ggtitle("B") + 
+    theme(plot.title=element_text(size=rel(1.5), lineheight=.9, family="Times",
+          face="bold", colour="Black", hjust = 0),
+          axis.text.x = element_text(angle = 90, vjust = 0.5))
+```
+#### ANALYSIS
+```{r, error=FALSE, message=FALSE, warning=FALSE, cache=TRUE, tidy=FALSE}
+#head(ulva)
+ulva.cf.aov<-
+  ulva %>%
+  mutate(Number.of.days = as.factor(Number.of.days)) %>%
+  group_by(Number.of.days,Treatment, Replicate) %>%
+  dplyr::rename(Period = Number.of.days) %>%
+  dplyr::summarise(meancf = mean(Condition.Factor))
+aov.cf.u<-aov(meancf ~ Period * Treatment, data = ulva.cf.aov)
+
+# Kelp data set
+kelp.cf.aov<-
+  kelp %>%
+  mutate(Number.of.days = as.factor(Number.of.days)) %>%
+  group_by(Number.of.days,Treatment, Replicate) %>%
+  dplyr::rename(Period = Number.of.days) %>%
+  dplyr::summarise(meancf = mean(Condition.Factor)) %>%
+  ungroup()
+aov.cf.k<-aov(meancf ~ Period * Treatment, data = kelp.cf.aov)
+
+#summary(aov.cf)
+#TukeyHSD(aov.cf)
+#tidy(aov.cf)
+## Extract fixed effects table only and make it pretty
+table<-tidy(aov.cf)
+kable(table, align = "c", 
+    caption = "Summary table for the two-way ANOVA perfromed on the data for condition factor of abalone. A significant effect of time was evident (p = 0.00002) with no treatment effect.")
+```
+
+```{r, error=FALSE, message=FALSE, warning=FALSE, cache=TRUE, tidy=FALSE}
+# Setting up each set for the Ulva data
+cf.u.p1<- ulva.cf.aov %>%
+  filter(Period == "112")
+cf.u.p2<- ulva.cf.aov %>%
+  filter(Period == "223")
+cf.u.p3<- ulva.cf.aov %>%
+  filter(Period == "366")
+cf.u.pt<- ulva.cf.aov %>%
+  filter(Period == "0")
+# ANOVA
+cf.u.a.p1<-aov(meancf ~ Treatment, data = cf.u.p1)
+cf.u.a.p2<-aov(meancf ~ Treatment, data = cf.u.p2)
+cf.u.a.p3<-aov(meancf ~ Treatment, data = cf.u.p3)
+cf.u.a.pt<-aov(meancf ~ Treatment, data = cf.u.pt)
+# Summary and test
+needs(car)
+# Period 1
+summary(cf.u.a.p1)
+TukeyHSD(cf.u.a.p1)
+hist(resid(cf.u.a.p1))
+bartlett.test(meancf ~ Treatment, data = cf.u.p1) # p=0.1448
+leveneTest(meancf~Treatment,  data = cf.u.p1) #p=0.6598
+# Period 2
+summary(cf.u.a.p2)
+TukeyHSD(cf.u.a.p2)
+hist(resid(cf.u.a.p2))
+bartlett.test(meancf ~ Treatment, data = cf.u.p2) # p=0.06505 
+leveneTest(meancf~Treatment,  data = cf.u.p2) #p=0.6914
+# Period 3
+summary(cf.u.a.p3)
+TukeyHSD(cf.u.a.p3)
+hist(resid(cf.u.a.p3))
+bartlett.test(meancf ~ Treatment, data = cf.u.p3) # p=0.7847
+leveneTest(meancf~Treatment,  data = cf.u.p3) #p=0.9669
+
+# Baseline
+summary(cf.u.a.pt)
+TukeyHSD(cf.u.a.pt)
+hist(resid(cf.u.a.pt))
+bartlett.test(meancf ~ Treatment, data = cf.u.pt) # p=0.2678
+leveneTest(meancf~Treatment,  data = cf.u.pt) #p=0.8842
+
+# Setting up each set for the kelp data
+load("cache/kelp.cf.aov.Rdata")
+cf.k.p1<- kelp.cf.aov %>%
+  filter(Period == "112") # NOT WORKING!!!
+cf.k.p2<- kelp.cf.aov %>%
+  filter(Period == "223") # NOT WORKING!!!
+cf.k.p3<- kelp.cf.aov %>%
+  filter(Period == "366")
+cf.k.pt<- kelp.cf.aov %>%
+  filter(Period == "0")
+# ANOVA
+cf.k.a.p1<-aov(meancf ~ Treatment, data = cf.k.p1) # NOT WORKING!!!
+cf.k.a.p2<-aov(meancf ~ Treatment, data = cf.k.p2) # NOT WORKING!!!
+cf.k.a.p3<-aov(meancf ~ Treatment, data = cf.k.p3)
+cf.k.a.pt<-aov(meancf ~ Treatment, data = cf.k.pt)
+# Summary and test
+needs(car)
+# Period 1 NOT WORKING!!!
+summary(cf.k.a.p1)
+TukeyHSD(cf.k.a.p1)
+hist(resid(cf.k.a.p1))
+bartlett.test(meancf ~ Treatment, data = cf.k.p1) # p=0.1448
+leveneTest(meancf~Treatment,  data = cf.k.p1) #p=0.6598
+# Period 2 NOT WORKING!!!
+summary(cf.k.a.p2)
+TukeyHSD(cf.k.a.p2)
+hist(resid(cf.k.a.p2))
+bartlett.test(meancf ~ Treatment, data = cf.k.p2) # p=0.06505 
+leveneTest(meancf~Treatment,  data = cf.k.p2) #p=0.6914
+# Period 3
+summary(cf.k.a.p3)
+TukeyHSD(cf.k.a.p3)
+hist(resid(cf.k.a.p3))
+bartlett.test(meancf ~ Treatment, data = cf.k.p3) # p=0.5678
+leveneTest(meancf~Treatment,  data = cf.k.p3) #p=0.9198
+
+# Baseline
+summary(cf.k.a.pt)
+TukeyHSD(cf.k.a.pt)
+hist(resid(cf.k.a.pt))
+bartlett.test(meancf ~ Treatment, data = cf.k.pt) # p=0.5618
+leveneTest(meancf~Treatment,  data = cf.k.pt) #p=0.9013
+```
+
+### Mixed Effects Model
+#### LOAD
+### Load the data
+```{r}
+load("/Users/morganbrand/Desktop/PhD/r/data/Rdata/ulva.Rdata")
+load("/Users/morganbrand/Desktop/PhD/r/data/Rdata/ulva.mean.se.Rdata")
+
+load("/Users/morganbrand/Desktop/PhD/r/data/Rdata/kelp.Rdata")
+load("/Users/morganbrand/Desktop/PhD/r/data/Rdata/kelp.mean.se.W.Rdata")
+```
+#### PLOT
+##### Ulva
+```{r, error=FALSE, message=FALSE, warning=FALSE, cache=TRUE, tidy=FALSE}
+dat<- ulva
+# renaming the treatments in the ros
+revalue(dat$Treatment, c("1" = "Control")) -> dat$Treatment
+revalue(dat$Treatment, c("2" = "100AU")) -> dat$Treatment
+revalue(dat$Treatment, c("3" = "80AU")) -> dat$Treatment
+revalue(dat$Treatment, c("4" = "70AU")) -> dat$Treatment
+revalue(dat$Treatment, c("5" = "60AU")) -> dat$Treatment
+revalue(dat$Treatment, c("6" = "40AU")) -> dat$Treatment
+lmc <- lmeControl(niterEM = 100200, msMaxIter = 100200) 
+mfinal<-lme(log(Weight) ~ Number.of.days + Treatment, 
+             random =~ 1 + Number.of.days | Basket, 
+             control = lmc, data = dat, method = "REML", 
+             weights = varIdent(form =~ 1 | Number.of.days))
+#m <- summary(mfinal)
+#am <- anova(mfinal)
+## Extract fixed effects table only and make it pretty
+
+table.u <- prettify(summary(mfinal), 
+                    labels = NULL,
+                    sep = ": ", 
+                    extra.column = FALSE,
+                    confint = FALSE, 
+                    level = 0.95,
+                    smallest.pval = 0.001, 
+                    digits = 3, 
+                    scientific = FALSE,
+                    signif.stars = getOption("show.signif.stars"))
+
+#print(xtable(table,
+#             , caption='Summary table for the final model used to determine the effect of time and treatment on the final growth in #abalone by weight.'),
+#      comment = FALSE)
+
+# table.b<-tidy(summary(mfinal))
+
+xtable.u <- xtable(table.u)
+
+```
+
+```{r, error=FALSE, message=FALSE, warning=FALSE, cache=TRUE, tidy=FALSE}
+#ulva%>%
+#  filter(Number.of.days == 0) %>%
+#  group_by(Number.of.days) %>%
+#  dplyr::summarise(meanwt = mean(Weight),
+#            sdwt = sd(Weight))
+
+
+#pd <- position_dodge(25)
+#name the plot
+ulva.weight <- 
+  ggplot(data=ulva.mean.se, aes(x=Number.of.days, y=Weight, colour = Treatment)) + 
+  geom_errorbar(aes(ymin=Weight-se, ymax=Weight+se), width=.1, position=position_dodge(width=25)) +
+  geom_line(position=position_dodge(width=25)) +
+  geom_point(position=position_dodge(width=25), aes(shape = Treatment, colour = Treatment)) +
+  xlab("") +
+  ylab("Mean weight (g)") +
+  scale_y_continuous(limits=c(50,150), breaks=seq(50,150, by = 10)) +
+  scale_x_continuous(breaks=seq(0,390, by = 30)) +
+  scale_colour_manual(values = c("mediumpurple", "greenyellow", "springgreen", "limegreen", "chartreuse4", "darkolivegreen")) +
+  theme_classic() +
+  ggtitle("A") + 
+  theme(plot.title=element_text(size=rel(1.5), 
+                                lineheight=.9, family="Times",
+                                face="bold", colour="Black", hjust = 0))
+```
+
+
+##### Kelp
+```{r, error=FALSE, message=FALSE, warning=FALSE, cache=TRUE, tidy=FALSE}
+dat.k<- kelp
+# renaming the treatments in the ros
+revalue(dat.k$Treatment, c("1" = "Control")) -> dat.k$Treatment
+revalue(dat.k$Treatment, c("2" = "100AK")) -> dat.k$Treatment
+revalue(dat.k$Treatment, c("3" = "80AK")) -> dat.k$Treatment
+revalue(dat.k$Treatment, c("4" = "70AK")) -> dat.k$Treatment
+revalue(dat.k$Treatment, c("5" = "60AK")) -> dat.k$Treatment
+revalue(dat.k$Treatment, c("6" = "40AK")) -> dat.k$Treatment
+lmc <- lmeControl(niterEM = 100200, msMaxIter = 100200) 
+mfinal.k<-lme(log(Weight) ~ Number.of.days + Treatment, 
+             random =~ 1 + Number.of.days | Basket, 
+             control = lmc, data = dat.k, method = "REML", 
+             weights = varIdent(form =~ 1 | Number.of.days))
+m.k <- summary(mfinal.k)
+am.k <- anova(mfinal.k)
+## Extract fixed effects table only and make it pretty
+prettify(summary(mfinal.k), confint = FALSE)
+
+
+table.k <- prettify(summary(mfinal.k), 
+                    labels = NULL,
+                    sep = ": ", 
+                    extra.column = FALSE,
+                    confint = FALSE, 
+                    level = 0.95,
+                    smallest.pval = 0.001, 
+                    digits = 3,
+                    scientific = FALSE,
+                    signif.stars = getOption("show.signif.stars"))
+xtable.k <- xtable(table.k)
+
+#kable(table.k, 
+#      digits = 3,
+#      align = "c", 
+#    caption = "Summary table for the final model used to determine the effect of 'time' and 'treatment' on the final growth in abalone #by weight.")
+```
+
+```{r, error=FALSE, message=FALSE, warning=FALSE, cache=TRUE, tidy=FALSE}
+kelp.weight <-
+  ggplot(data=kelp.mean.se.W, aes(x=Number.of.days, y=Weight, colour = Treatment)) + 
+  geom_errorbar(aes(ymin=Weight-se, ymax=Weight+se), width=.1, position=position_dodge(width=25)) +
+  geom_line(position=position_dodge(width=25)) +
+  geom_point(position=position_dodge(width=25), aes(shape = Treatment, colour = Treatment)) +
+  annotate("text", x=364, y=148, label="*", family="serif",
+           colour="black", size=3) +
+  xlab("Time in Days") +
+  ylab("Mean Weight (g)") +
+  scale_y_continuous(limits=c(50,150), breaks=seq(50,150, by = 10)) +
+  scale_x_continuous(breaks=seq(0,390, by = 30))+
+  scale_colour_manual(values = c("mediumpurple", "tan4", "brown", "darkorange3", "goldenrod3", "gold1")) +
+  theme_classic() +
+  ggtitle("B") + 
+  theme(plot.title=element_text(size=rel(1.5), 
+                                lineheight=.9, family="Times",
+                                face="bold", colour="Black", hjust = 0))
+
+```
+#### ANALYSIS
+
+### Glycogen
+#### LOAD
+### Load the data
+```{r}
+load("/Users/morganbrand/Desktop/PhD/r/data/Rdata/gly.Rdata")
+```
+#### PLOT
+```{r, error=FALSE, message=FALSE, warning=FALSE, cache=TRUE, tidy=FALSE}
+glycogen <- 
+  ggplot(gly, aes(x=Treatment, y=mg.g, fill = Treatment)) + 
+  geom_boxplot(outlier.colour = NA) + 
+  stat_summary(fun="mean", geom="point", shape=23, size=3, fill="white") +
+  scale_y_continuous(limits=c(0,140), breaks=seq(0,140, by = 20)) +
+  theme_classic() +
+  scale_fill_manual(values = c("mediumpurple", "greenyellow", "springgreen", "limegreen", "chartreuse4", "darkolivegreen")) +
+  xlab("Treatment") +
+  ylab("Muscle Glycogen (mg/g)")
+```
+#### ANALYSIS
+```{r , error=FALSE, message=FALSE, warning=FALSE, cache=TRUE, tidy=FALSE}
+#str(gly)
+
+gly.stat <- summarySE(gly, measurevar="mg.g", groupvars=c("Treatment"), na.rm = TRUE)
+
+gly.aov <-
+  gly %>%
+  mutate(Replicate = as.factor(Replicate))
+#str(gly.aov)
+aov.gly<-aov(mg.g ~ Treatment, data = gly.aov)
+#summary(aov.gly)
+#TukeyHSD(aov.gly)
+#tidy(aov.gly)
+## Extract fixed effects table only and make it pretty
+#gly.table<-tidy(aov.gly)
+#gly.table.k<-kable(table, align = "c", 
+#    caption = "Summary table for the one-way ANOVA perfromed on the muscle glycogen concentraition in abalone at the end of a one year growth trial. No significant effect of treatment was #found.")
+
+#gly.table.kk <- prettify(summary(aov.gly), 
+#                    labels = NULL,
+#                    sep = ": ", 
+#                    extra.column = FALSE,
+#                    confint = FALSE, 
+#                    level = 0.95,
+#                    smallest.pval = 0.001, 
+#                    digits = 3,
+#                    scientific = FALSE,
+#                    signif.stars = getOption("show.signif.stars"))
+#xtable.k <- xtable(table.k)
+#library(jsonlite)
+```

@@ -1,0 +1,2207 @@
+---
+title: "Chapter 3"
+output: html_notebook
+---
+# Readme
+
+This code is the combination of working chunks that were used for the completion of my phd thesis. This document should contain the necessary information to reproduce the plotting and analysis in the methods section but it is not a stand alone reproducible document. It is advised that the specific area of interest be isolated from the .Rmd file and those chunks be run accordingly.
+
+# Introduction
+
+This notebook contains all the relevant analysis and test for Chapter 3 of my thesis. The objective of this study is to investigate the effect of diet on the free circulating haemolymph glucose and the innate immune response of abalone.
+Specific aims are:
+
+  1) Quantify basal circulating haemolymph glucose under induced starvation conditions and monitor the abalones ability to maintain glycemic homoeostasis over 24 days.
+  
+  2) Induce hyperglycaemia via pallial sinus injection for abalone fed variable diets and quantify the animals ability to return to basal glycemia either abfeed of Ulva.
+  
+  3) Challenge abalone maintained of either abfeed or ulva with a known dose of bacteria and monitor the short term effect of their innate immune response.
+
+
+
+# Starvation
+## Read the raw data
+
+The first experiment was conducted to determine basal circulating glucose concentrations so that the dose for a glycemic response challenge would be sufficient to induce hyperglycaemia
+
+```{r starvation, include=FALSE}
+# Get the new file into the environment 
+starv <- read_rds("data/starv.rds")
+```
+
+## Clean data
+
+```{r, include=FALSE}
+# Starvation
+starv1 <- 
+  starv %>%
+  mutate(days = as.factor(days)) %>%
+  dplyr::select(-X4) %>% 
+  group_by(time, days, tank) %>%
+  dplyr::summarise(gluc_conc_mean = mean(gluc_conc))
+save(starv1, file = "chpt3/Rdata/starv1.Rdata")
+```
+
+## New data
+
+This is going to be done for both the raw data and the averaged date
+
+```{r , include=FALSE}
+# Mean blood glucose for the fed state
+starv3 <- starv1 %>% 
+  filter(days == 0) %>%
+  group_by(tank) %>%
+  summarise(gluc = mean(gluc_conc_mean))
+mean(starv3$gluc)
+sd(starv3$gluc)
+
+# Mean blood glucose for the starved state
+starv4 <- starv1 %>% 
+  filter(days == 24) %>%
+  group_by(tank) %>%
+  summarise(gluc = mean(gluc_conc_mean))
+mean(starv4$gluc)
+sd(starv4$gluc)
+
+# Mean blood glucose for the flat part of the curve
+starv2 <- starv1 %>% 
+  filter(days > 12) %>%
+  summarise(gluc = mean(gluc_conc_mean))
+mean(starv2$gluc)
+sd(starv2$gluc)
+```
+
+Raw data below
+```{r , include=FALSE}
+# Mean blood glucose for the fed state
+starvA <- starv %>% 
+  filter(days == 0) %>%
+  group_by(tank) %>%
+  summarise(gluc = mean(gluc_conc),
+            glucsd = sd(gluc_conc))
+mean(starvA$gluc)
+sd(starvA$gluc)
+
+# Mean blood glucose for the starved state
+starvB <- starv %>% 
+  filter(days == 24) %>%
+  group_by(tank) %>%
+  summarise(gluc = mean(gluc_conc),
+            glucsd = sd(gluc_conc))
+mean(starvB$gluc)
+sd(starvB$gluc)
+
+# Mean blood glucose for the flat part of the curve
+starvC <- starv %>% 
+  filter(days == c(0,0,0,0,0,0,2,2,2)) %>%
+  summarise(gluc = mean(gluc_conc),
+            glucsd = sd(gluc_conc))
+
+starv6 <- 
+  starv %>% 
+  dplyr::filter(time > 1) %>%
+  summarise(gluc = mean(gluc_conc),
+            glucsd = sd(gluc_conc))
+
+#6,6,6,6,6,6,9,9,9,9,13,13,13,13,13,13,17,17,17,17,17,24,24,24,24,24,24
+mean(starvC$gluc)
+sd(starvC$gluc)
+
+
+
+starvD <- starv %>% 
+  filter(days == 6) %>%
+  group_by(tank) %>%
+  summarise(gluc = mean(gluc_conc),
+            glucsd = sd(gluc_conc))
+```
+## PLot 
+
+### Checking fo outliers
+```{r}
+ ggplot(data=starv1, aes(x=time, y=gluc_conc_mean)) + 
+  geom_boxplot(outlier.colour = "red", outlier.shape = 1, coef = 2.5) +
+  stat_summary(fun.y="mean", geom="point", shape=23, size=3, fill="white") +
+  #scale_y_continuous(limits=c(0, 250), breaks=seq(0, 250, by = 50)) +
+  theme_classic() 
+
++
+  scale_fill_manual(values = c("mediumpurple","limegreen")) +
+  #facet_wrap(~time) +
+  theme(legend.position = "none") +
+  labs( 
+    x = "",
+    y = expression(paste("Glucose concentration ", mu,g,"/",mL))) +
+  ggtitle("With outliers")
+```
+
+
+
+```{r, echo=FALSE}
+load("chpt3/Rdata/starv1.Rdata")
+head(starv1)
+summary(starv1)
+starvation_curve<-
+  ggplot(starv1, aes(days, gluc_conc_mean)) +
+  geom_point() +
+  geom_smooth(se = FALSE) +
+  theme_bw() +
+  theme(legend.position = "none") +
+  labs( 
+    x = "Time in days",
+    y = expression(paste("Glucose concentration ", mu,g,"/",mL)),
+    title = "Resting hemolymph glucose concentration of a period of induced starvation",
+    subtitle = "Two seaters (sports cars) are an exception because of their light weight",
+    caption = "Mean circulating glucose concentration for animals over a period of 24 days with no access to food."
+  )   
+
+```
+
+## Statistics
+
+```{r}
+# On raw data
+kruskal.test(gluc_conc ~ days, data= starv)
+
+starv <-
+  starv %>%
+  mutate(time=factor(time, labels='time'))
+model_starv<-aov(gluc_conc ~ days, starv)
+summary(model_starv)
+TukeyHSD(model_starv)
+# Bartlett Test of Homogeneity of Variances
+bartlett.test(gluc_conc ~ days, starv) # p=0.0003
+
+# Homogeneity of Variance Plot
+library(HH)
+hovBF(gluc_conc ~ days, data=starv) #p-value = 0.6045
+hovplotBF(gluc_conc ~ days, data=starv)
+
+#TESTING ASSUMPTIONS
+#Generate residual and predicted values
+resids <- residuals(model_starv)
+preds <- predict(model_starv)
+sq_preds <- preds^2
+#Look at a plot of residual vs. predicted values
+plot(resids ~ preds, xlab = "Predicted Values", ylab = "Residuals")
+#Perform a Shapiro-Wilk test for normality of residuals
+shapiro.test(resids) #p-value = 1.888e-06
+
+# On average
+model_starv1<-aov(gluc_conc_mean ~ time, starv)
+summary(model_starv1)
+TukeyHSD(model_starv1)
+# Bartlett Test of Homogeneity of Variances
+bartlett.test(gluc_conc_mean ~ time, starv1) # p=0.06962
+
+# Homogeneity of Variance Plot
+library(HH)
+hovBF(gluc_conc_mean ~ time, data=starv1) #p-value = 0.6045
+hovplotBF(gluc_conc_mean ~ time, data=starv1)
+
+#TESTING ASSUMPTIONS
+#Generate residual and predicted values
+resids <- residuals(model_starv1)
+preds <- predict(model_starv1)
+sq_preds <- preds^2
+#Look at a plot of residual vs. predicted values
+plot(resids ~ preds, xlab = "Predicted Values", ylab = "Residuals")
+#Perform a Shapiro-Wilk test for normality of residuals
+shapiro.test(resids) #p-value = 0.04888
+```
+
+To see the output above in a **kable**...
+```{r table-starv1}
+model_starv1<-aov(gluc_conc_mean ~ time, starv1)
+knitr::kable(tidy(
+  model_starv1),
+  caption = 'Statistical summary for starvation curve'
+)
+```
+***
+
+# Glycemic Response - Medium group
+
+Two sets of abalone were challenged with a consistent dose of glucose 50 &micro;g.mL^-1^ in order to asses their rate of clearance. These groups/experiments will be called "medium" and "large" abalone respectively.
+
+The animals used in this experiment were fed either *Ulva* or Abfeed for a period of 6 months prior to the experiment.
+
+## Read the raw data
+
+```{r medium-glyresp, include=FALSE}
+# Get the new file into the environment 
+glyr_mdose <- read_rds("data/glyr_mdose.rds")
+```
+
+### Dose-control
+
+The data used here is in dropbox/ALL WORK FOR PHD/2011 masters/sea point/intravenous/intravenous DATA.xlsx
+```{r medium-glyresp, include=FALSE}
+# Get the new file into the environment 
+glyr_dc1 <- read_rds("data/glyr_dc1.rds")
+```
+
+
+## Clean data
+
+```{r, include=FALSE}
+glyr_m2 <- 
+  glyr_mdose %>%
+  unite(feed_treat, diet, treatment) %>%
+  dplyr::select(-length, -weight, -cf) %>%
+  gather("time", "gluc_conc", 3:9, na.rm = TRUE) %>%
+  separate(feed_treat, c("diet", "treatment")) %>%
+  mutate(treatment = stringr::str_replace(treatment, "Abfeed", "Response")) %>%
+  mutate(treatment = stringr::str_replace(treatment, "Ulva", "Response")) %>%
+  mutate(time = stringr::str_replace(time, "t0", "0")) %>%
+  mutate(time = stringr::str_replace(time, "t15", "15")) %>%
+  mutate(time = stringr::str_replace(time, "t30", "30")) %>%
+  mutate(time = stringr::str_replace(time, "t45", "45")) %>%
+  mutate(time = stringr::str_replace(time, "t60", "60")) %>%
+  mutate(time = stringr::str_replace(time, "t120", "120")) %>%
+  mutate(time = stringr::str_replace(time, "t180", "180"))
+```
+
+```{r, include=FALSE}
+# First I will prepare the data for only basal glucose
+glyr_mt0 <-
+  glyr_m2 %>%
+  filter(time == "0")
+head(glyr_mt0)
+
+# Each group was givin a know dose of glucose and the rate 
+# of clearance monitored.
+glyr_mdose <-
+  glyr_m2 %>%
+  mutate(diet = as.factor(diet),
+         treatment = as.factor(treatment),
+         animal = as.factor(animal),
+         time = as.numeric(time))
+
+head(glyr_mdose)
+```
+
+```{r, include=FALSE}
+# First I will prepare the data for only basal glucose
+glyr_mt0 <-
+  glyr_m2 %>%
+  filter(time == "0")
+head(glyr_mt0)
+
+
+# Each group was givin a know dose of glucose and the rate 
+# of clearance monitored.
+glyr_mdose <-
+  glyr_m2 %>%
+  mutate(diet = as.factor(diet),
+         treatment = as.factor(treatment),
+         animal = as.factor(animal),
+         time = as.numeric(time))
+
+head(glyr_mdose)
+```
+
+### Dose-control
+```{r, include=FALSE}
+glyr_dc3 <- 
+  glyr_dc1 %>%
+  unite(feed_treat, diet, treatment) %>%
+  dplyr::select(-length, -weight, -cf) %>%
+  gather("time", "gluc_conc", 3:9, na.rm = TRUE) %>%
+  separate(feed_treat, c("diet", "treatment")) %>%
+  mutate(treatment = stringr::str_replace(treatment, "Abfeed", "Response")) %>%
+  mutate(treatment = stringr::str_replace(treatment, "Ulva", "Response")) %>%
+  mutate(time = stringr::str_replace(time, "t0", "0")) %>%
+  mutate(time = stringr::str_replace(time, "t15", "15")) %>%
+  mutate(time = stringr::str_replace(time, "t30", "30")) %>%
+  mutate(time = stringr::str_replace(time, "t45", "45")) %>%
+  mutate(time = stringr::str_replace(time, "t60", "60")) %>%
+  mutate(time = stringr::str_replace(time, "t120", "120")) %>%
+  mutate(time = stringr::str_replace(time, "t180", "180"))
+
+```
+
+```{r, include=FALSE}
+# First I will prepare the data for only basal glucose
+glyr_dct0 <-
+  glyr_dc3 %>%
+  filter(time == "0")
+head(glyr_dct0)
+
+
+# Each group was givin a know dose of glucose and the rate 
+# of clearance monitored.
+glyr_dc4 <-
+  glyr_dc3 %>%
+  mutate(diet = as.factor(diet),
+         treatment = as.factor(treatment),
+         animal = as.factor(animal),
+         time = as.numeric(time))
+
+head(glyr_mdose)
+
+```
+
+## New data
+
+
+## PLot 
+
+To have an idea of the data I have used a simple facet_wrap to visualize all the animals individual response curves and fitted a smooth, method = loess.
+
+```{r smallglyrespfacet, echo=FALSE}
+#Basic plot of response data
+ggplot(glyr_mdose, aes(time, gluc_conc)) +
+  geom_point(aes(color = diet)) +
+  geom_line(aes(color = animal)) +
+  geom_smooth() +
+  facet_wrap(diet~treatment, nrow = 3) +
+  theme_bw()
+```
+
+Figure \@ref(fig:glyrM) squashes the curve too much and it makes the differences difficult to see. I am going to present them as single plots rather.
+
+```{r glyrM, echo=FALSE, fig.align='center', out.width= "70%", fig.cap= "aa"}
+# Plot with facets
+ggplot(glyr_mdose, aes(time, gluc_conc)) +
+  #geom_point(aes(color = diet)) +
+  geom_line(aes(color = animal)) +
+  geom_smooth() +
+  facet_wrap(diet~treatment, nrow = 3) +
+  scale_y_continuous(limits=c(0,120), breaks=seq(0,120, by = 25)) +
+  scale_x_continuous(breaks=seq(0,180, by = 30)) +
+  theme_bw() +
+  theme(legend.position = "none") +
+  labs( x = "Time in minutes",
+        y = expression(paste("Glucose concentration ", mu,g,"/",mL)))
+```
+
+To make the plot for my thesis I will separate each dietary group using the pipe. 
+
+### Abfeed only
+
+```{r glyrAbfeedM, echo=FALSE, fig.align='center', out.width= "70%", fig.cap= "aa"}
+# A for Abfeed
+glyr_mdose_plot_A <- 
+  glyr_mdose %>%
+  filter(diet == "Abfeed") %>%
+  ggplot(aes(time, gluc_conc)) +
+  #geom_point(aes(color = animal)) +
+  geom_line(aes(color = animal)) +
+  geom_smooth(span = 0.8) +
+  facet_wrap(~treatment) +
+  scale_y_continuous(limits=c(-10,120), breaks=seq(0,120, by = 10)) +
+  scale_x_continuous(breaks=seq(0,180, by = 15)) +
+  theme_bw() +
+  theme(legend.position = "none") +
+  labs( x = "Time in minutes",
+        y = expression(paste("Glucose concentration ", mu,g,"/",mL)))
+
+```
+
+### *Ulva* only
+
+```{r glyrUlvaM, echo=FALSE, fig.align='center', out.width= "70%", fig.cap= "aa"}
+# Ulva only
+glyr_mdose_plot_U <- 
+  glyr_mdose %>%
+  filter(diet == "Ulva") %>%
+  ggplot(aes(time, gluc_conc)) +
+  #geom_point(aes(color = animal)) +
+  geom_line(aes(color = animal)) +
+  geom_smooth(span = 0.8) +
+  facet_wrap(~treatment) +
+  scale_y_continuous(limits=c(-10,120), breaks=seq(0,120, by = 10)) +
+  scale_x_continuous(breaks=seq(0,180, by = 15)) +
+  theme_bw() +
+  theme(legend.position = "none") +
+  labs( x = "Time in minutes",
+        y = expression(paste("Glucose concentration ", mu,g,"/",mL)))
+```
+
+## Statistics
+
+### Time 0
+
+Each animal was sampled prior to glycemic challenge and is termed time 0. This would reflect the animals basal glucose levels and can be used to investigate variation between treatment groups. 
+
+```{r time0M}
+glyr_mdose %>%
+  filter(time == "0") %>%
+  mutate(time = as.factor(time)) %>%
+  do(tidy(t.test(gluc_conc ~ diet, data = .)))
+
+glyr_mdose %>%
+  filter(time == "0") %>%
+  group_by(diet) %>%
+  dplyr::summarise(gluc_mean = mean(gluc_conc), 
+            gluc_sd = sd(gluc_conc))
+```
+
+### Abfeed only
+
+To interpret the data I am going to look at each treatment group individually and compare the mean values at each time point with one way ANOVA. Time will be set as a factor 
+
+```{r}
+#AOV first
+glyr_mdose %>%
+  filter(treatment == "Response",
+         diet == "Abfeed") %>%
+  mutate(time = as.factor(time)) %>%
+  do(tidy(aov(gluc_conc ~ time, data = .)))
+
+#TukeyHSD
+glyr_mdose %>%
+  filter(treatment == "Response",
+         diet == "Abfeed") %>%
+  mutate(time = as.factor(time)) %>%
+  do(tidy(TukeyHSD(aov(gluc_conc ~ time, data = .))))
+```
+
+The next step is to test model requirements
+
+```{r}
+# Bartlett Test of Homogeneity of Variances
+glyr_mdose %>%
+  filter(treatment == "Response",
+         diet == "Abfeed") %>%
+  mutate(time = as.factor(time)) %>%
+do(tidy(bartlett.test(gluc_conc ~ time, data = .))) # p=0.05146927
+
+# Homogeneity of Variance Plot
+library(HH)
+glyr_mdose %>%
+  filter(treatment == "Response",
+         diet == "Abfeed") %>%
+  mutate(time = as.factor(time)) %>%
+do(tidy(hovBF(gluc_conc ~ time, data=.))) #p-value = 0.6045
+
+glyr_mdose %>%
+  filter(treatment == "Response",
+         diet == "Abfeed") %>%
+  mutate(time = as.factor(time)) %>%
+hovplotBF(gluc_conc ~ time, data=.)
+
+
+#TESTING ASSUMPTIONS
+#Generate residual and predicted values
+glyr_mdose.mod.a <- glyr_mdose %>%
+  filter(treatment == "Response",
+         diet == "Abfeed") %>%
+  mutate(time = as.factor(time))
+m1 <- aov(gluc_conc ~ time, data = glyr_mdose.mod.a)
+
+resids <- residuals(m1)
+preds <- predict(m1)
+sq_preds <- preds^2
+#Look at a plot of residual vs. predicted values
+plot(resids ~ preds, xlab = "Predicted Values", ylab = "Residuals")
+#Perform a Shapiro-Wilk test for normality of residuals
+shapiro.test(resids) #p-value = 0.04888
+```
+
+To see the output of these statistical analysis above using **kable**...
+
+```{r table-glyr-mdose-A, tidy=FALSE, out.width="70%", }
+load("data/glyr_mdose.Rdata")
+model_glyrA <- glyr_mdose %>%
+  filter(treatment == "Response",
+         diet == "Abfeed") %>%
+  mutate(time = as.factor(time)) %>%
+  aov(gluc_conc ~ time, data = .)
+
+
+kable(tidy(
+  model_glyrA),
+  caption = 'Statistical summary for ANOVA of glycemic response of animals injected with 1000 &micro;g glucose'
+)
+
+kable(tidy(
+  TukeyHSD(model_glyrA)),
+  caption = 'Tukey comparison for ANOVA for mean hemolymph glucose at each time point'
+)
+```
+
+### *Ulva* only
+
+```{r}
+#AOV first
+glyr_mdose %>%
+  filter(treatment == "Response",
+         diet == "Ulva") %>%
+  mutate(time = as.factor(time)) %>%
+  do(tidy(aov(gluc_conc ~ time, data = .)))
+
+#TukeyHSD
+glyr_mdose %>%
+  filter(treatment == "Response",
+         diet == "Ulva") %>%
+  mutate(time = as.factor(time)) %>%
+  do(tidy(TukeyHSD(aov(gluc_conc ~ time, data = .))))
+```
+
+```{r}
+# Bartlett Test of Homogeneity of Variances
+glyr_mdose %>%
+  filter(treatment == "Response",
+         diet == "Ulva") %>%
+  mutate(time = as.factor(time)) %>%
+do(tidy(bartlett.test(gluc_conc ~ time, data = .))) # p=0.04371077
+
+# Homogeneity of Variance Plot
+library(HH)
+glyr_mdose %>%
+  filter(treatment == "Response",
+         diet == "Ulva") %>%
+  mutate(time = as.factor(time)) %>%
+do(tidy(hovBF(gluc_conc ~ time, data=.))) #p-value = 0.6691938
+
+glyr_mdose %>%
+  filter(treatment == "Response",
+         diet == "Ulva") %>%
+  mutate(time = as.factor(time)) %>%
+hovplotBF(gluc_conc ~ time, data=.)
+
+#TESTING ASSUMPTIONS
+#Generate residual and predicted values
+glyr_mdose.mod.u <- glyr_mdose %>%
+  filter(treatment == "Response",
+         diet == "Ulva") %>%
+  mutate(time = as.factor(time))
+m2 <- aov(gluc_conc ~ time, data = glyr_mdose.mod.u)
+
+resids <- residuals(m1)
+preds <- predict(m1)
+sq_preds <- preds^2
+#Look at a plot of residual vs. predicted values
+plot(resids ~ preds, xlab = "Predicted Values", ylab = "Residuals")
+#Perform a Shapiro-Wilk test for normality of residuals
+shapiro.test(resids) #p-value = 0.1001
+```
+
+To see the output of these statistical analysis above using **kable**...
+
+```{r table-glyr-mdose-U, tidy=FALSE, out.width="70%", }
+load("data/glyr_mdose.Rdata")
+model_glyrU <- glyr_mdose %>%
+  filter(treatment == "Response",
+         diet == "Ulva") %>%
+  mutate(time = as.factor(time)) %>%
+  aov(gluc_conc ~ time, data = .)
+
+
+kable(tidy(
+  model_glyrU),
+  caption = 'Statistical summary for ANOVA of glycemic response of animals injected with 1000 &micro;g glucose'
+)
+
+kable(tidy(
+  TukeyHSD(model_glyrU)),
+  caption = 'Tukey comparison for ANOVA for mean hemolymph glucose at each time point'
+)
+```
+
+# Glycemic response - Large group
+
+Large farm reared abalone were challenged with the same glucose as the medium group after a 1 year growth trial
+
+## Read the raw data
+
+```{r, include=FALSE}
+glyr_l1 <- read_rds("data/glyr_l1.rds")
+```
+
+## Clean data
+
+```{r, include=FALSE}
+# First I will prepare the data for only basal glucose
+glyr_lt0 <-
+  glyr_l1 %>%
+  filter(time == "0")
+head(glyr_lt0)
+
+
+# Each group was givin a know dose of glucose and the rate 
+# of clearance monitored.
+glyr_ldose <-
+  glyr_l1 %>%
+  filter(experiment == "Response") %>%
+  unite(feed_treat, diet, treatment) %>%
+  dplyr::select(-experiment) %>%
+  separate(feed_treat, c("diet", "treatment")) %>%
+  mutate(diet = as.factor(diet),
+         treatment = as.factor(treatment),
+         animal = as.factor(animal),
+         feed = as.factor(feed))
+
+head(glyr_ldose)
+```
+
+## New data
+
+blah blah blha
+
+```{r, include=FALSE}
+a<- glyr_ldose %>%
+  mutate(time = as.factor(time)) %>%
+  group_by(diet, time) %>%
+  dplyr::summarise(gluc_mean = mean(gluc_conc),
+                   gluc_sd = sd(gluc_conc))
+```
+
+## PLot
+
+To have an idea of the data I have used a simple facet_wrap to visualize all the animals individual response curves and fitted a smooth, method = loess.
+
+```{r large-glyresp-facet, echo=FALSE}
+#Basic plot of response data
+ggplot(glyr_ldose, aes(time, gluc_conc)) +
+  #geom_point(aes(color = diet)) +
+  geom_line(aes(color = animal)) +
+  geom_smooth() +
+  facet_wrap(diet~treatment, nrow = 3) +
+  theme_bw()
+```
+
+Figure \@ref(fig:glyrL) squashes the curve too much and it makes the differences difficult to see. I am going to present them as single plots rather.
+
+```{r large-glyresp-facet-grid, echo=FALSE}
+#Basic plot of response data
+ggplot(glyr_ldose, aes(time, gluc_conc)) +
+  #geom_point(aes(color = diet)) +
+  geom_line(aes(color = animal)) +
+  geom_smooth() +
+  facet_grid(treatment~diet) +
+  theme_bw()
+```
+
+```{r glyrL, echo=FALSE, fig.align='center', out.width= "70%", fig.cap= "aa"}
+# Plot with facets
+glyrL.all <- 
+  ggplot(glyr_ldose, aes(time, gluc_conc)) +
+  #geom_point(aes(color = diet)) +
+  geom_line(aes(color = animal)) +
+  geom_smooth() +
+  facet_wrap(diet~treatment, nrow = 3) +
+  scale_y_continuous(breaks=seq(0,100, by = 25)) +
+  scale_x_continuous(breaks=seq(0,120, by = 15)) +
+  theme_bw() +
+  theme(legend.position = "none") +
+  labs( x = "Time in minutes",
+        y = expression(paste("Glucose concentration ", mu,g,"/",mL)))
+
+```
+
+To make the plot for my thesis I will separate each dietary group using the pipe. 
+
+### Abfeed only
+
+```{r glyrAbfeed, echo=FALSE, fig.align='center', out.width= "70%", fig.cap= "aa"}
+# A for Abfeed
+glyrL.A <- 
+  glyr_ldose %>%
+  filter(diet == "Abfeed") %>%
+  ggplot(aes(time, gluc_conc)) +
+  #geom_point(aes(color = animal)) +
+  geom_line(aes(color = animal)) +
+  geom_smooth(span = 0.8) +
+  facet_wrap(~treatment) +
+  scale_y_continuous(limits=c(-10,100), breaks=seq(0,100, by = 10)) +
+  scale_x_continuous(breaks=seq(0,120, by = 15)) +
+  theme_bw() +
+  theme(legend.position = "none") +
+  labs( x = "Time in minutes",
+        y = expression(paste("Glucose concentration ", mu,g,"/",mL)))
+```
+
+### *Ulva* only
+
+```{r glyrUlva, echo=FALSE, fig.align='center', out.width= "70%", fig.cap= "aa"}
+# Ulva only
+glyrL.U <- 
+  glyr_ldose %>%
+  filter(diet == "U40") %>%
+  ggplot(aes(time, gluc_conc)) +
+  #geom_point(aes(color = animal)) +
+  geom_line(aes(color = animal)) +
+  geom_smooth(span = 0.8) +
+  facet_wrap(~treatment) +
+  scale_y_continuous(limits=c(-10,100), breaks=seq(0,100, by = 10)) +
+  scale_x_continuous(breaks=seq(0,120, by = 15)) +
+  theme_bw() +
+  theme(legend.position = "none") +
+  labs( x = "Time in minutes",
+        y = expression(paste("Glucose concentration ", mu,g,"/",mL)))
+```
+
+### Kelp only
+
+```{r glyrKelp, echo=FALSE, fig.align='center', out.width= "70%", fig.cap= "aa"}
+#Kelp only
+glyrL.K <- glyr_ldose %>%
+  filter(diet == "K70") %>%
+  ggplot(aes(time, gluc_conc)) +
+  #geom_point(aes(color = animal)) +
+  geom_line(aes(color = animal)) +
+  geom_smooth(span = 0.8) +
+  facet_wrap(~treatment) +
+  scale_y_continuous(limits=c(-10,100), breaks=seq(0,100, by = 10)) +
+  scale_x_continuous(breaks=seq(0,120, by = 15)) +
+  theme_bw() +
+  theme(legend.position = "none") +
+  labs( x = "Time in minutes",
+        y = expression(paste("Glucose concentration ", mu,g,"/",mL)))
+
+```
+
+### Plots for the Grob
+
+I attempted to include all the plots into a single figure with A, B, C but it doesn't look as good. I cannot get the axis label right and the scaling goes all funny.
+
+```{r echo=FALSE}
+# A for Abfeed
+A <- glyr_ldose %>%
+  filter(diet == "Abfeed") %>%
+  ggplot(aes(time, gluc_conc)) +
+  geom_point(aes(color = animal)) +
+  geom_line(aes(color = animal)) +
+  geom_smooth(span = 0.5) +
+  facet_wrap(~treatment) +
+  scale_y_continuous(limits=c(0,100), breaks=seq(0,100, by = 20)) +
+  scale_x_continuous(breaks=seq(0,120, by = 15)) +
+  theme_bw() +
+  ggtitle("A") +
+  theme(legend.position = "none", 
+        plot.title=element_text(size=rel(1.5), 
+                                lineheight=.9, family="Times",
+                                face="bold", colour="Black", 
+                                hjust = 0)) +
+  labs( 
+    x = "",
+    y = expression(paste("Glucose concentration ", mu,g,"/",mL)))
+
+
+```
+
+```{r echo=FALSE}
+# Ulva only
+B <- 
+  glyr_ldose %>%
+  filter(diet == "U40") %>%
+  ggplot(aes(time, gluc_conc)) +
+  geom_point(aes(color = animal)) +
+  geom_line(aes(color = animal)) +
+  geom_smooth(span = 0.5) +
+  facet_wrap(~treatment) +
+  scale_y_continuous(limits=c(0,100), breaks=seq(0,100, by = 20)) +
+  scale_x_continuous(breaks=seq(0,120, by = 15)) +
+  theme_bw() +
+  ggtitle("B") +
+  theme(legend.position = "none", 
+        plot.title=element_text(size=rel(1.5), 
+                                lineheight=.9, family="Times",
+                                face="bold", colour="Black", 
+                                hjust = 0)) +
+  labs( 
+    x = "",
+    y = "")
+```
+
+```{r echo=FALSE}
+#Kelp only
+C <- 
+  glyr_ldose %>%
+  filter(diet == "K70") %>%
+  ggplot(aes(time, gluc_conc)) +
+  geom_point(aes(color = animal)) +
+  geom_line(aes(color = animal)) +
+  geom_smooth(span = 0.5) +
+  facet_wrap(~treatment) +
+  scale_y_continuous(limits=c(0,100), breaks=seq(0,100, by = 20)) +
+  scale_x_continuous(breaks=seq(0,120, by = 15)) +
+  theme_bw() +
+  ggtitle("C") +
+  theme(legend.position = "none", 
+        plot.title=element_text(size=rel(1.5), 
+                                lineheight=.9, family="Times",
+                                face="bold", colour="Black", 
+                                hjust = 0)) +
+  labs( 
+    x = "",
+    y = "")
+```
+
+## Statistics
+
+### Time 0
+
+Each animal was sampled prior to glycemic challenge and is termed time 0. This would reflect the animals basal glucose levels and can be used to investigate variation between treatment groups. 
+
+```{r time0L}
+#for time 0 I will also include the basal data as to have more data points for analysis
+glyr_l1 %>%
+  filter(time == "0") %>%
+  do(tidy(aov(gluc_conc ~ diet, data = .)))
+# p=0.012097
+
+glyr_l1 %>%
+  filter(time == "0") %>%
+  do(tidy(TukeyHSD(aov(gluc_conc ~ diet, data = .))))
+# U40-K70
+
+glyr_l1 %>%
+  filter(time == "0") %>%
+  group_by(diet) %>%
+  dplyr::summarise(gluc_mean = mean(gluc_conc), 
+            gluc_sd = sd(gluc_conc))
+```
+
+### Abfeed only
+
+To interpret the data I am going to look at each treatment group individually and compare the mean values at each time point with one way ANOVA. Time will be set as a factor 
+
+```{r}
+#AOV first
+glyr_l1 %>%
+  filter(treatment == "Response",
+         diet == "Abfeed") %>%
+  mutate(time = as.factor(time)) %>%
+  do(tidy(aov(gluc_conc ~ time, data = .)))
+# p=0.4153591
+
+#TukeyHSD
+glyr_l1 %>%
+  filter(treatment == "Response",
+         diet == "Abfeed") %>%
+  mutate(time = as.factor(time)) %>%
+  do(tidy(TukeyHSD(aov(gluc_conc ~ time, data = .))))
+```
+
+The next step is to test model requirements
+
+```{r}
+# Bartlett Test of Homogeneity of Variances
+glyr_l1 %>%
+  filter(treatment == "Response",
+         diet == "Abfeed") %>%
+  mutate(time = as.factor(time)) %>%
+do(tidy(bartlett.test(gluc_conc ~ time, data = .))) # p=0.4914788
+# p=0.4914788
+
+# Homogeneity of Variance Plot
+
+glyr_l1 %>%
+  filter(treatment == "Response",
+         diet == "Abfeed") %>%
+  mutate(time = as.factor(time)) %>%
+do(tidy(hovBF(gluc_conc ~ time, data=.))) 
+#p-value = 0.7203619
+
+glyr_l1 %>%
+  filter(treatment == "Response",
+         diet == "Abfeed") %>%
+  mutate(time = as.factor(time)) %>%
+hovplotBF(gluc_conc ~ time, data=.)
+
+#TESTING ASSUMPTIONS
+#Generate residual and predicted values
+glyr_l1.mod.a <- glyr_l1 %>%
+  filter(treatment == "Response",
+         diet == "Abfeed") %>%
+  mutate(time = as.factor(time))
+m1 <- aov(gluc_conc ~ time, data = glyr_l1.mod.a)
+
+resids <- residuals(m1)
+preds <- predict(m1)
+sq_preds <- preds^2
+#Look at a plot of residual vs. predicted values
+plot(resids ~ preds, xlab = "Predicted Values", ylab = "Residuals")
+#Perform a Shapiro-Wilk test for normality of residuals
+shapiro.test(resids) #p-value = 0.04888
+```
+
+### *Ulva* only
+
+```{r}
+#AOV first
+glyr_l1 %>%
+  filter(treatment == "Response",
+         diet == "U40") %>%
+  mutate(time = as.factor(time)) %>%
+  do(tidy(aov(gluc_conc ~ time, data = .)))
+# p=0.05415554
+
+#TukeyHSD
+glyr_l1 %>%
+  filter(treatment == "Response",
+         diet == "U40") %>%
+  mutate(time = as.factor(time)) %>%
+  do(tidy(TukeyHSD(aov(gluc_conc ~ time, data = .))))
+# 120-0 p=0.05783120
+```
+
+```{r}
+# Bartlett Test of Homogeneity of Variances
+glyr_l1 %>%
+  filter(treatment == "Response",
+         diet == "U40") %>%
+  mutate(time = as.factor(time)) %>%
+do(tidy(bartlett.test(gluc_conc ~ time, data = .))) # p=0.9817849
+
+# Homogeneity of Variance Plot
+glyr_l1 %>%
+  filter(treatment == "Response",
+         diet == "U40") %>%
+  mutate(time = as.factor(time)) %>%
+do(tidy(hovBF(gluc_conc ~ time, data=.))) #p-value = 0.8650568
+
+glyr_l1 %>%
+  filter(treatment == "Response",
+         diet == "U40") %>%
+  mutate(time = as.factor(time)) %>%
+hovplotBF(gluc_conc ~ time, data=.)
+
+
+#TESTING ASSUMPTIONS
+#Generate residual and predicted values
+glyr_l1.mod.u <- glyr_l1 %>%
+  filter(treatment == "Response",
+         diet == "U40") %>%
+  mutate(time = as.factor(time))
+m3 <- aov(gluc_conc ~ time, data = glyr_l1.mod.u)
+
+resids <- residuals(m3)
+preds <- predict(m3)
+sq_preds <- preds^2
+#Look at a plot of residual vs. predicted values
+plot(resids ~ preds, xlab = "Predicted Values", ylab = "Residuals")
+#Perform a Shapiro-Wilk test for normality of residuals
+shapiro.test(resids) #p-value = 0.06826
+```
+
+### Kelp only
+
+```{r}
+#AOV first
+glyr_l1 %>%
+  filter(treatment == "Response",
+         diet == "K70") %>%
+  mutate(time = as.factor(time)) %>%
+  do(tidy(aov(gluc_conc ~ time, data = .)))
+# p=0.02378838
+
+#TukeyHSD
+glyr_l1 %>%
+  filter(treatment == "Response",
+         diet == "K70") %>%
+  mutate(time = as.factor(time)) %>%
+  do(tidy(TukeyHSD(aov(gluc_conc ~ time, data = .))))
+# 0-120 p=0.01295473
+```
+
+```{r}
+glyr_l1 %>%
+  filter(treatment == "Response",
+         diet == "K70") %>%
+  mutate(time = as.factor(time)) %>%
+do(tidy(bartlett.test(gluc_conc ~ time, data = .))) # p=0.04371077
+
+# Homogeneity of Variance Plot
+glyr_l1 %>%
+  filter(treatment == "Response",
+         diet == "K70") %>%
+  mutate(time = as.factor(time)) %>%
+do(tidy(hovBF(gluc_conc ~ time, data=.))) #p-value = 0.8573492
+
+glyr_l1 %>%
+  filter(treatment == "Response",
+         diet == "K70") %>%
+  mutate(time = as.factor(time)) %>%
+hovplotBF(gluc_conc ~ time, data=.)
+
+#TESTING ASSUMPTIONS
+#Generate residual and predicted values
+glyr_l1.mod.k <- glyr_l1 %>%
+  filter(treatment == "Response",
+         diet == "K70") %>%
+  mutate(time = as.factor(time))
+m4 <- aov(gluc_conc ~ time, data = glyr_l1.mod.k)
+
+resids <- residuals(m4)
+preds <- predict(m4)
+sq_preds <- preds^2
+#Look at a plot of residual vs. predicted values
+plot(resids ~ preds, xlab = "Predicted Values", ylab = "Residuals")
+#Perform a Shapiro-Wilk test for normality of residuals
+shapiro.test(resids) #p-value = 0.07038
+```
+
+# Bacterial Challenge
+
+chp3-bacterial challenge
+
+
+## Read the raw data
+
+```{r immune, include=FALSE, eval=FALSE}
+#LEACE THIS ONE OUT
+
+#######
+######
+#####
+
+#immune <- read_csv("data/chp3-bacterial challenge.csv")
+#immune <- read_csv("data/bc.raw.csv", col_names = FALSE, skip = 1)
+#immune1 <- immune %>% 
+#  dplyr::select(-X1, -X4, -X5, -X6, -X7, -X12, -X13, -X14) %>%
+#  dplyr::rename(animal = X2, 
+#                time = X3,
+#                treatment = X8,
+#                gluc_conc = X9,
+#                hc = X10,
+#                cfu = X11)
+
+#names(immune1)
+# Save the imported data as a .rds in the input folder if there are no
+# problems()
+#write_csv(immune1, "chpt3/input/immune1.csv")
+# remove the .csv
+#rm(immune)
+#load("chpt3/input/immune1.csv")
+```
+
+```{r, include=FALSE, eval=FALSE}
+# remove the .csv
+load("data/immune1.Rdata")
+```
+
+## Clean data
+
+Below an attempt was made to sepparate the time responce and remove outlier animals and then put it all back togehter. I think that this might be the right way but for what I am asking the mean is made up of random samples and who is to say that both time points on an individual animal were skewed?
+
+```{r, eval=FALSE, include=FALSE}
+dat.A <- immune1 %>%
+  drop_na(gluc_conc) %>%
+  group_by(time, treatment) %>%
+  select(animal, time, treatment, gluc_conc) %>%
+  spread(key = time, value = gluc_conc) 
+
+names(dat.A)[3:4] <- c('initial', 'final')
+
+%>%
+  filter(treatment == "Abfeed") 
+
+boxplot(initial ~ treatment, range=2.5, data = dat.A)
+boxplot(final ~ treatment, range=2.5, data = dat.A)
+
+names(dat.A)[3:4] <- c('initial', 'final')
+
+hist(dat.A$gluc_conc)
+  
+abfeed.glu<- 
+  dat.A%>%
+  drop_na(initial) %>%
+  drop_na(final) %>%
+  filter(!(abs(initial - mean(initial)) > 2.5*sd(initial))) %>%
+  filter(!(abs(final - mean(final)) > 2.5*sd(final))) %>%
+  gather("time", "gluc_conc", 3,4)
+
+hist(abfeed.glu$gluc_conc)
+hist(immune1$gluc_conc)
+
+dat.U <- immune1 %>%
+  drop_na(gluc_conc) %>%
+  group_by(time, treatment) %>%
+  select(animal, time, treatment, gluc_conc) %>%
+  spread(key = time, value = gluc_conc) %>%
+  filter(treatment == "Ulva") 
+
+names(dat.U)[3:4] <- c('initial', 'final')
+
+dat.U%>%
+  drop_na(initial) %>%
+  drop_na(final) %>%
+  filter(!(abs(initial - mean(initial)) > 2.5*sd(initial))) %>%
+  filter(!(abs(final - mean(final)) > 2.5*sd(final))) 
+
+%>%
+  filter(- gluc_conc <= 0)
+save(immune2.gluc, file = "chpt3/Rdata/immune2.gluc.Rdata")
+```
+
+
+```{r, include=FALSE, eval=FALSE}
+#The following has become redundant because I fount the drop_na() function. I am loving dplyr and its pipes :)
+#Outliers
+# filter(!(abs(gluc_conc - median(gluc_conc)) > 2*sd(gluc_conc))) 
+#in the future use   drop_na(hc) in the pipe line to drop NAs
+
+# Glucose only data set
+
+immune2.gluc <- 
+  immune1 %>%
+  drop_na(gluc_conc) %>%
+  group_by(time, treatment) %>%
+  filter(!(abs(gluc_conc - mean(gluc_conc)) > 2.5*sd(gluc_conc))) %>%
+  filter(- gluc_conc <= 0) 
+save(immune2.gluc, file = "chpt3/Rdata/immune2.gluc.Rdata")
+
+# THC counts only
+immune2.thc<- 
+  immune1 %>%
+  drop_na(hc) %>%
+  group_by(time, treatment) %>%
+  filter(!(abs(hc - mean(hc)) > 2.5*sd(hc)))
+save(immune2.thc, file = "chpt3/Rdata/immune2.thc.Rdata")
+
+
+
+# CFU only
+immune2.cfu<- 
+  immune1 %>%
+  mutate(cfu = ifelse(cfu == "0", NA, cfu)) %>%
+  drop_na(cfu) %>%
+  group_by(time, treatment) %>%
+  filter(!(abs(cfu - mean(cfu)) > 2.5*sd(cfu)))
+save(immune2.cfu, file = "chpt3/Rdata/immune2.cfu.Rdata")
+
+boxplot(gluc_conc ~ treatment, range=2.5, data = immune1)
+boxplot(hc ~ treatment, range=2.5, data = immune1)
+boxplot(cfu ~ treatment, range=2.5, data = immune1)
+boxplot(cfu ~ treatment, range=2.5, data = immune2.cfu)
+
+```
+
+Load in the new data that has been created
+
+```{r}
+#Glucose
+load("data/immune2.gluc.Rdata")
+#THC
+load("data/immune2.thc.Rdata")
+#CFU
+load("data/immune2.cfu.Rdata")
+```
+
+
+## New data
+
+I am going to plot the data which includes outliers and then with them removed to motivate on their removal.
+
+### Glucose
+
+```{r}
+
+data.ot <- immune1
+# With outliers
+data.glu.ot <- 
+  data.ot %>%
+  drop_na(gluc_conc) %>%
+  group_by(time, treatment) %>%
+  #filter(!(abs(gluc_conc - mean(gluc_conc)) > 2.5*sd(gluc_conc))) %>%
+  filter(- gluc_conc <= 0) %>%
+  select(animal, time, treatment, gluc_conc) 
+
+save(data.glu.ot, file = "index/chpt3/Rdata/data.glu.ot.Rdata")
+
+
+
+glu.ot.plot<- 
+  ggplot(data=data.glu.ot, aes(x=treatment, y=gluc_conc, fill = treatment)) + 
+  geom_boxplot(outlier.colour = "red", outlier.shape = 1, coef = 2.5) +
+  stat_summary(fun.y="mean", geom="point", shape=23, size=3, fill="white") +
+  scale_y_continuous(limits=c(0, 250), breaks=seq(0, 250, by = 50)) +
+  theme_classic() +
+  scale_fill_manual(values = c("mediumpurple","limegreen")) +
+  facet_wrap(~time) +
+  theme(legend.position = "none") +
+  labs( 
+    x = "",
+    y = expression(paste("Glucose concentration ", mu,g,"/",mL))) +
+  ggtitle("With outliers")
+
+names(data.glu.ot)[3:4] <- c('initial', 'final')
+#boxplot(initial ~ treatment, range=2.5, data = data.glu.ot)
+#boxplot(final ~ treatment, range=2.5, data = data.glu.ot)
+
+# Without outliers
+data.glu.no <- 
+  data.ot %>%
+  drop_na(gluc_conc) %>%
+  group_by(time, treatment) %>%
+  filter(!(abs(gluc_conc - mean(gluc_conc)) > 2.5*sd(gluc_conc))) %>%
+  filter(- gluc_conc <= 0) %>%
+  select(animal, time, treatment, gluc_conc) 
+save(data.glu.no, file = "index/chpt3/Rdata/data.glu.no.Rdata")
+
+
+
+glu.no.plot<- 
+  ggplot(data=data.glu.no, aes(x=treatment, y=gluc_conc, fill = treatment)) + 
+  geom_boxplot(outlier.colour = "red", outlier.shape = 1, coef = 2.5) +
+  stat_summary(fun.y="mean", geom="point", shape=23, size=3, fill="white") +
+  scale_y_continuous(limits=c(0, 250), breaks=seq(0, 250, by = 50)) +
+  theme_classic() +
+  scale_fill_manual(values = c("mediumpurple","limegreen")) +
+  facet_wrap(~time) +
+  theme(legend.position = "none") +
+  labs( 
+    x = "",
+    y = expression(paste("Glucose concentration ", mu,g,"/",mL))) +
+  ggtitle("Without outliers")
+
+names(data.glu.no)[3:4] <- c('initial', 'final')
+#boxplot(initial ~ treatment, range=2.5, data = data.glu.no)
+#boxplot(final ~ treatment, range=2.5, data = data.glu.no)
+
+grid.arrange(glu.ot.plot, glu.no.plot, nrow = 1)
+```
+
+### THC
+
+```{r}
+data.ot <- immune1
+# With outliers
+data.thc.ot <- 
+  data.ot %>%
+  drop_na(hc) %>%
+  group_by(time, treatment) %>%
+  #filter(!(abs(gluc_conc - mean(gluc_conc)) > 2.5*sd(gluc_conc))) %>%
+  filter(- hc <= 0) %>%
+  select(animal, time, treatment, hc) %>%
+  spread(key = time, value = hc)
+
+names(data.thc.ot)[3:4] <- c('initial', 'final')
+boxplot(initial ~ treatment, range=2.5, data = data.thc.ot)
+boxplot(final ~ treatment, range=2.5, data = data.thc.ot)
+
+```
+
+### CFU
+
+```{r}
+
+data.ot <- immune1
+# With outliers
+data.cfu.ot <- 
+  data.ot %>%
+  drop_na(cfu) %>%
+  group_by(time, treatment) %>%
+  #filter(!(abs(gluc_conc - mean(gluc_conc)) > 2.5*sd(gluc_conc))) %>%
+  filter(- cfu <= 0) %>%
+  select(animal, time, treatment, cfu) 
+save(data.cfu.ot, file = "index/chpt3/Rdata/data.cfu.ot.Rdata")
+
+#%>%
+#  spread(key = time, value = cfu)
+#names(data.cfu.ot)[3] <- 'final'
+#boxplot(final ~ treatment, range=2.5, data = data.cfu.ot)
+
+cfu.ot.plot <- 
+  ggplot(data=data.cfu.ot, aes(x=treatment, y=cfu, fill = treatment)) + 
+  geom_boxplot(outlier.colour = "red", outlier.shape = 1, coef = 2.51) +
+  stat_summary(fun.y="mean", geom="point", shape=23, size=3, fill="white") +
+  #scale_y_continuous(limits=c(0, 250), breaks=seq(0, 250, by = 50)) +
+  theme_classic() +
+  scale_fill_manual(values = c("mediumpurple","limegreen")) +
+  #facet_wrap(~time) +
+  theme(legend.position = "none") +
+  labs( 
+    x = "",
+    y = expression(paste("Glucose concentration ", mu,g,"/",mL))) +
+  ggtitle("With outliers")
+
+# Without outliers
+data.cfu.no <- 
+  data.ot %>%
+  drop_na(cfu) %>%
+  group_by(time, treatment) %>%
+  filter(!(abs(cfu - mean(cfu)) > 2.5*sd(cfu))) %>%
+  filter(- cfu <= 0) %>%
+  select(animal, time, treatment, cfu)
+
+#For some reason it is not taking out animal E3 in Abfeeed of 20000 so I ran this again to get rid of it. Just checked, the outlier is less than 2.51xsd so I will just adjust the plot and leave it in there.
+#data.cfu.no2 <- 
+#  data.cfu.no %>%
+#  filter(!(abs(cfu - mean(cfu)) > 2.5*sd(cfu)))
+save(data.cfu.no, file = "index/chpt3/Rdata/data.cfu.no.Rdata")
+
+#%>%
+#  spread(key = time, value = cfu)
+#names(data.cfu.no)[3] <- c('final')
+#boxplot(final ~ treatment, range=2.5, data = data.glu.no)
+
+cfu.no.plot<- 
+  ggplot(data=data.cfu.no, aes(x=treatment, y=cfu, fill = treatment)) + 
+  geom_boxplot(outlier.colour = "red", outlier.shape = 1, coef = 2.7) +
+  #geom_jitter(position = position_jitter(0.5), aes(colour = Diet))
+  stat_summary(fun.y="mean", geom="point", shape=23, size=3, fill="white") +
+  #scale_y_continuous(limits=c(0, 250), breaks=seq(0, 250, by = 50)) +
+  theme_classic() +
+  scale_fill_manual(values = c("mediumpurple","limegreen")) +
+  #facet_wrap(~time) +
+  theme(legend.position = "none") +
+  labs( 
+    x = "",
+    y = expression(paste("Glucose concentration ", mu,g,"/",mL))) +
+  ggtitle("With outliers")
+
+
+
+grid.arrange(cfu.ot.plot, cfu.no.plot, nrow = 1)
+
+```
+## PLots
+
+```{r}
+#Glucose
+load("index/chpt3/Rdata/data.glu.ot.Rdata")
+load("index/chpt3/Rdata/data.glu.no.Rdata")
+#CFU
+load("index/chpt3/Rdata/data.cfu.ot.Rdata")
+load("index/chpt3/Rdata/data.cfu.no.Rdata")
+
+cfu.no.plot<- 
+  ggplot(data=data.cfu.no, aes(x=treatment, y=cfu, fill = treatment)) + 
+  geom_boxplot(outlier.colour = "red", outlier.shape = 1, coef = 2.5) +
+  stat_summary(fun.y="mean", geom="point", shape=23, size=3, fill="white") +
+  #scale_y_continuous(limits=c(0, 250), breaks=seq(0, 250, by = 50)) +
+  theme_classic() +
+  scale_fill_manual(values = c("mediumpurple","limegreen")) +
+  #facet_wrap(~time) +
+  theme(legend.position = "none") +
+  labs( 
+    x = "",
+    y = expression(paste("Glucose concentration ", mu,g,"/",mL))) +
+  ggtitle("With outliers")
+cfu.ot.plot<- 
+  ggplot(data=data.cfu.ot, aes(x=treatment, y=cfu, fill = treatment)) + 
+  geom_boxplot(outlier.colour = "red", outlier.shape = 1, coef = 2.5) +
+  stat_summary(fun.y="mean", geom="point", shape=23, size=3, fill="white") +
+  #scale_y_continuous(limits=c(0, 250), breaks=seq(0, 250, by = 50)) +
+  theme_classic() +
+  scale_fill_manual(values = c("mediumpurple","limegreen")) +
+  #facet_wrap(~time) +
+  theme(legend.position = "none") +
+  labs( 
+    x = "",
+    y = expression(paste("Glucose concentration ", mu,g,"/",mL))) +
+  ggtitle("With outliers")
+grid.arrange(cfu.ot.plot, cfu.no.plot, nrow = 1)
+
+
+#glucose
+glu.ot.plot<- 
+  ggplot(data=data.glu.ot, aes(x=treatment, y=gluc_conc, fill = treatment)) + 
+  geom_boxplot(outlier.colour = "red", outlier.shape = 1, coef = 2.5) +
+  stat_summary(fun.y="mean", geom="point", shape=23, size=3, fill="white") +
+  scale_y_continuous(limits=c(0, 250), breaks=seq(0, 250, by = 50)) +
+  theme_classic() +
+  scale_fill_manual(values = c("mediumpurple","limegreen")) +
+  facet_wrap(~time) +
+  theme(legend.position = "none") +
+  labs( 
+    x = "",
+    y = expression(paste("Glucose concentration ", mu,g,"/",mL))) +
+  ggtitle("With outliers")
+
+glu.no.plot<- 
+  ggplot(data=data.glu.no, aes(x=treatment, y=gluc_conc, fill = treatment)) + 
+  geom_boxplot(outlier.colour = "red", outlier.shape = 1, coef = 2.5) +
+  stat_summary(fun.y="mean", geom="point", shape=23, size=3, fill="white") +
+  scale_y_continuous(limits=c(0, 250), breaks=seq(0, 250, by = 50)) +
+  theme_classic() +
+  scale_fill_manual(values = c("mediumpurple","limegreen")) +
+  facet_wrap(~time) +
+  theme(legend.position = "none") +
+  labs( 
+    x = "",
+    y = expression(paste("Glucose concentration ", mu,g,"/",mL))) +
+  ggtitle("Without outliers")
+
+grid.arrange(glu.ot.plot, glu.no.plot, nrow = 1)
+
+
+```
+
+
+### Change in blood glucose
+
+During an immune response circulating blood glucose is readily utilised for celluar energy and will deacrease wit time.
+
+```{r}
+#position=position_dodge(width=1)
+load("chpt3/Rdata/immune2.gluc.Rdata")
+glucose.bc.plot <-
+  immune2.gluc %>%
+  dplyr::select(time, treatment, gluc_conc) %>%
+  group_by(time, treatment) %>%
+  dplyr::summarise_each(funs(mean,sd,se=sd(.)/sqrt(n()))) %>%
+  ggplot(aes(x=time, y=mean, colour = treatment)) + 
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.1, position=position_dodge(width=1)) +
+  geom_point(, position=position_dodge(width=1)) +
+  geom_line(, position=position_dodge(width=1)) +
+  scale_y_continuous(limits=c(0,70), breaks=seq(0,70, by = 10)) +
+  scale_x_continuous(breaks=seq(0,30, by = 30)) +
+  theme_bw() +
+  theme(legend.position = "right") +
+  labs( x = "Time in minutes",
+        y = expression(paste("Glucose concentration ", mu,g,"/",mL)))
+
+glucose.bc.plot
+#ggplotly(glucose.bc.plot)
+
+
+```
+
+### Total Hemocyte count
+
+Hemocytes are like little white blood cells and form part of the abalones innate immune response
+
+```{r}
+#position=position_dodge(width=1)
+load("chpt3/Rdata/immune2.thc.Rdata")
+thc.bc <- immune2.thc
+save(thc.bc, file = "cache/thc.bc.Rdata")
+load("cache/thc.bc.Rdata")
+pt.hc.se<-summarySE(immune2.thc, measurevar="hc", groupvars=c("treatment", "time"), na.rm = TRUE)
+thc.bc.plot<- 
+  immune2.thc %>%
+  dplyr::select(time, treatment, hc) %>%
+  group_by(time, treatment) %>%
+  dplyr::summarise_each(funs(mean,sd,se=sd(.)/sqrt(n()))) %>%
+  ggplot(aes(x=time, y=mean, colour = treatment)) + 
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.1, position=position_dodge(width=1)) +
+  geom_point(position=position_dodge(width=1)) +
+  geom_line(position=position_dodge(width=1)) +
+  #scale_y_continuous(limits=c(1,1e9), breaks=seq(1,1e9, by = 1e1)) +
+  #scale_x_continuous(breaks=seq(0,30, by = 30)) +
+  theme_bw() +
+  theme(legend.position = "right") +
+  labs( x = "Time in minutes",
+        y = "Total hemocyte count")
+#ggplotly(thc.bc.plot)
+thc.bc.plot
+
+
+
+
+```
+
+Figure \@ref(fig:xx) shows the individual animal difference in hemocyte counts. Ulva fed animals are labeld "F" and Abfeed fed are "E".
+
+```{r xx, echo=FALSE}
+# to see how each individual animal performed
+xx <-  
+  immune2.thc %>%
+  dplyr::select(animal, time, treatment, hc) %>%
+  ggplot(aes(x=time, y=hc, colour = animal)) + 
+  geom_point(aes(colour = animal), position=position_dodge(width=1)) +
+  geom_line(aes(colour = animal), position=position_dodge(width=1)) +
+  #scale_y_continuous(limits=c(1,1e9), breaks=seq(1,1e9, by = 1e1)) +
+  #scale_x_continuous(breaks=seq(0,30, by = 30)) +
+  theme_bw() +
+  theme(legend.position = "right") +
+  labs( x = "Time in minutes",
+        y = "Total hemocyte count")
+#ggplotly(xx)
+xx
+```
+
+### Culture forming Units
+
+```{r}
+#position=position_dodge(width=1)
+load("chpt3/Rdata/immune2.cfu.Rdata")
+cfu.bc.plot <-
+  immune2.cfu %>%
+  dplyr::select(time, treatment, cfu) %>%
+  group_by(time, treatment) %>%
+  dplyr::summarise_each(funs(mean,sd,se=sd(.)/sqrt(n()))) %>%
+  ggplot(aes(x=treatment, y=mean, fill = treatment)) + 
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.1) +
+  geom_bar(stat = "identity") +
+  #scale_y_continuous(limits=c(0,8000), breaks=seq(0,8000, by = 2000)) +
+  #scale_x_continuous(breaks=seq(0,30, by = 30)) +
+  theme_bw() +
+  theme(legend.position = "right") +
+  labs( x = "Time in minutes",
+        y = "Culture forming units (CFU)")
+cfu.bc.plot
+
+
+
+```
+
+## Statistics
+
+Things to test:
+
+1) Is there a difference from time 0 to time 30 in each variable withing treatments
+2) Is there a difference from time 0 to time 30 in each variable between treatments
+3) Correlation 
+
+I am going to prepare new data sets for the statistics and not dirty the ones I am using for plotting.
+
+```{r}
+# Glucose only data set
+load("data/immune1.Rdata")
+immune2.gluc.stat <- 
+  immune1 %>%
+  dplyr::select(animal, treatment, time, gluc_conc) %>%
+  mutate(treatment = as.factor(treatment)) %>%
+  mutate(time = as.factor(time)) %>%
+  group_by(time, treatment) %>%
+  filter(!(abs(gluc_conc - mean(gluc_conc)) > 2.5*sd(gluc_conc)))%>%
+  filter(- gluc_conc <= 0) %>%
+  spread(key = time, value = gluc_conc)
+# rename the coloum
+names(immune2.gluc.stat)[3:4] <- c('initial', 'final')
+save(immune2.gluc.stat, file = "chpt3/Rdata/immune2.gluc.stat.Rdata")
+# Drop NAs and create change for correlation
+immune2.gluc.stat2 <- 
+  immune2.gluc.stat %>%
+  drop_na(initial) %>%
+  drop_na(final) %>%
+  mutate(delta_gluc = (initial - final)/initial *100) 
+
+# THC counts only
+immune2.thc.stat<- 
+  immune1 %>%
+  drop_na(hc) %>%
+  dplyr::select(animal, treatment, time, hc) %>%
+  mutate(treatment = as.factor(treatment)) %>%
+  mutate(time = as.factor(time)) %>%
+  group_by(time, treatment) %>%
+  filter(!(abs(hc - mean(hc)) > 2.5*sd(hc))) %>%
+  spread(key = time, value = hc)
+# rename the coloum
+names(immune2.thc.stat)[3:4] <- c('initial', 'final')
+save(immune2.thc.stat, file = "index/chpt3/Rdata/immune2.thc.stat.Rdata")
+
+# Drop NAs and create change for correlation
+immune2.thc.stat2 <- 
+  immune2.thc.stat %>%
+  drop_na(initial) %>%
+  drop_na(final) %>%
+  mutate(delta_thc = (initial - final)/initial *100) 
+
+#immune2.thc.stat2 %>%
+#dplyr::summarise(delta_thc_mean = mean(delta_thc),
+#                   delta_thc_sd = sd(delta_thc))
+
+# CFU only
+immune2.cfu.stat<- 
+  immune1 %>%
+  drop_na(cfu) %>%
+  dplyr::select(animal, treatment, time, cfu) %>%
+  mutate(treatment = as.factor(treatment)) %>%
+  group_by(time, treatment) %>%
+  filter(!(abs(cfu - mean(cfu)) > 2.5*sd(cfu)))
+save(immune2.cfu.stat, file = "chpt3/Rdata/immune2.cfu.stat.Rdata")
+
+```
+
+Load in the new data that has been created for statistics
+
+```{r}
+#Glucose
+load("chpt3/Rdata/immune2.gluc.stat.Rdata")
+#THC
+load("chpt3/Rdata/immune2.thc.stat.Rdata")
+#CFU
+load("chpt3/Rdata/immune2.cfu.stat.Rdata")
+```
+
+### Glucose concentrations
+
+The first comparison will be done using t.test on the initial and final glucose concentrations between groups. Significance is set at 0.05
+
+```{r}
+# Difference between groups at initial
+tidy(t.test(initial ~ treatment, data = immune2.gluc.stat))
+
+# Difference between groups at final 
+tidy(t.test(final ~ treatment, data = immune2.gluc.stat))
+
+```
+
+The second comparison will be done using t.test on the initial and final glucose concentrations within groups. Significance is set at 0.05
+
+```{r}
+# Difference within Abfeed group at initial and final
+immune2.gluc.stat %>%
+  dplyr::select(animal, treatment, initial, final) %>%
+  gather("time", "gluc_conc", 3,4) %>%
+  mutate(time = as.factor(time)) %>%
+  filter(treatment == "Abfeed") %>%
+  do(tidy(t.test(gluc_conc ~ time, data = .)))
+
+# Difference within Ulva group at initial and final
+immune2.gluc.stat %>%
+  dplyr::select(animal, treatment, initial, final) %>%
+  gather("time", "gluc_conc", 3,4) %>%
+  mutate(time = as.factor(time)) %>%
+  filter(treatment == "Ulva") %>%
+  do(tidy(t.test(gluc_conc ~ time, data = .)))
+
+```
+
+### Total hemocyte counts
+
+The first comparison will be done using t.test on the initial and final glucose concentrations between groups. Significance is set at 0.05
+
+```{r}
+#THC
+load("chpt3/Rdata/immune2.thc.stat.Rdata")
+# Difference between groups at initial = significant
+tidy(t.test(initial ~ treatment, data = immune2.thc.stat))
+# No significance p=0.5290768
+# Difference between groups at final = significant
+tidy(t.test(final ~ treatment, data = immune2.thc.stat))
+# No significance p=0.9691169
+```
+
+The second comparison will be done using t.test on the initial and final THC counts within groups. Significance is set at 0.05
+
+```{r}
+#THC
+load("chpt3/Rdata/immune2.thc.stat.Rdata")
+# Difference within Abfeed group at initial and final
+immune2.thc.stat %>%
+  dplyr::select(animal, treatment, initial, final) %>%
+  gather("time", "thc", 3,4) %>%
+  mutate(time = as.factor(time)) %>%
+  filter(treatment == "Abfeed") %>%
+  do(tidy(t.test(thc ~ time, data = .)))
+# NO SIGNIFICANCE p=0.2578334
+
+# Difference within Ulva group at initial and final
+immune2.thc.stat %>%
+  dplyr::select(animal, treatment, initial, final) %>%
+  gather("time", "thc", 3,4) %>%
+  mutate(time = as.factor(time)) %>%
+  filter(treatment == "Ulva")%>%
+  do(tidy(t.test(thc ~ time, data = .)))
+# SIGNIFICANCE
+```
+
+### Bacterial count
+
+The first comparison will be done using t.test on the initial and final glucose concentrations between groups. Significance is set at 0.05
+
+```{r}
+# Difference between groups at initial = significant
+tidy(t.test(cfu ~ treatment, data = immune2.cfu.stat))
+# No significance
+```
+
+Hclust attempt
+
+```{r, eval=FALSE, include=FALSE}
+needs(stats)
+# Only looking at the change 
+A <- immune2.gluc.stat2 %>%
+  ungroup(treatment) %>%
+  dplyr::select(-treatment, -initial, -final)
+
+B <- immune2.thc.stat2 %>%
+  ungroup(treatment) %>%
+  dplyr::select(-treatment, -initial, -final)
+
+x <- inner_join(A, B, by = "animal") 
+
+modelname<-hclust(dist(x))
+
+plot(modelname, labels=x$animal)
+rect.hclust(modelname, 4)
+plot(modelname)
+
+#using initial counts and conc
+C <- immune2.gluc.stat2 %>%
+  ungroup(treatment) %>%
+  dplyr::select(-treatment, -final)
+
+D <- immune2.thc.stat2 %>%
+  ungroup(treatment) %>%
+  dplyr::select(-treatment, -final)
+
+y <- inner_join(C, D, by = "animal") 
+
+modelname<-hclust(dist(y))
+
+plot(modelname, labels=y$animal)
+rect.hclust(modelname, 4)
+plot(modelname)
+
+#using initial counts and conc
+E <- immune2.gluc.stat2 %>%
+  ungroup(treatment) %>%
+  dplyr::select(-treatment)
+
+F <- immune2.thc.stat2 %>%
+  ungroup(treatment) %>%
+  dplyr::select(-treatment)
+
+z <- inner_join(E, F, by = "animal") 
+
+modelname<-hclust(dist(z))
+
+plot(modelname, labels=z$animal)
+rect.hclust(modelname, 4)
+plot(modelname)
+
+```
+
+# Bacterial Challenge with OUTLIERS
+
+chp3-bacterial challenge
+
+
+## Read the raw data
+
+```{r immune, include=FALSE, eval=FALSE}
+#LEACE THIS ONE OUT
+
+#######
+######
+#####
+
+#immune <- read_csv("data/chp3-bacterial challenge.csv")
+#immune <- read_csv("data/bc.raw.csv", col_names = FALSE, skip = 1)
+#immune1 <- immune %>% 
+#  dplyr::select(-X1, -X4, -X5, -X6, -X7, -X12, -X13, -X14) %>%
+#  dplyr::rename(animal = X2, 
+#                time = X3,
+#                treatment = X8,
+#                gluc_conc = X9,
+#                hc = X10,
+#                cfu = X11)
+
+names(immune1)
+# Save the imported data as a .rds in the input folder if there are no
+# problems()
+#write_csv(immune1, "chpt3/input/immune1.csv")
+# remove the .csv
+#rm(immune)
+#load("chpt3/input/immune1.csv")
+```
+
+```{r, include=FALSE, eval=FALSE}
+immune <- read_csv("index/data/chp3-bacterial challenge-noot.csv", col_names = FALSE, skip = 1)
+f<- read.csv("data/chp3-bacterial challenge.csv")
+# Change the names to the working standard
+immune1 <- immune %>% 
+  dplyr::select(-X1, -X4, -X5, -X6, -X7) %>%
+  dplyr::rename(animal = X2, 
+                time = X3,
+                treatment = X8,
+                gluc_conc = X9,
+                hc = X10,
+                cfu = X11,
+                delta.thc = X12,
+                delta.gluc = X13)
+#write_csv(immune1, "data/immune1.csv")
+save(immune1, file = "data/immune1.Rdata")
+# remove the .csv
+load("data/immune1.Rdata")
+```
+
+## Clean data
+
+```{r, include=FALSE, eval=FALSE}
+#The following has become redundant because I fount the drop_na() function. I am loving dplyr and its pipes :)
+#Outliers
+# filter(!(abs(gluc_conc - median(gluc_conc)) > 2*sd(gluc_conc))) 
+#in the future use   drop_na(hc) in the pipe line to drop NAs
+
+# Glucose only data set
+immune2.gluc.noot <- 
+  immune1 %>%
+ drop_na(gluc_conc) %>%
+  group_by(time, treatment) %>%
+  #filter(!(abs(gluc_conc - mean(gluc_conc)) > 2.5*sd(gluc_conc))) %>%
+#  filter(- gluc_conc <= 0) 
+save(immune2.gluc.noot, file = "chpt3/Rdata/immune2.gluc.noot.Rdata")
+
+immune2.gluc.noot %>%
+  ungroup() %>%
+  group_by(animal) %>%
+  select(-F3)
+
+immune2.gluc.noot %>%
+  select(-animal == E2)
+summary(immune2.gluc.noot)
+summary(immune2.gluc)
+
+# THC counts only
+immune2.thc.noot<- 
+  immune1 %>%
+  drop_na(hc) %>%
+  group_by(time, treatment)
+  #filter(!(abs(hc - mean(hc)) > 2.5*sd(hc)))
+save(immune2.thc.noot, file = "chpt3/Rdata/immune2.thc.noot.Rdata")
+
+summary(immune2.thc.noot)
+summary(immune2.thc)
+
+# CFU only
+immune2.cfu.noot<- 
+  immune1 %>%
+  mutate(cfu = ifelse(cfu == "0", NA, cfu)) %>%
+#  drop_na(cfu) %>%
+  group_by(time, treatment)
+  #filter(!(abs(cfu - mean(cfu)) > 2.5*sd(cfu)))
+save(immune2.cfu.noot, file = "chpt3/Rdata/immune2.cfu.noot.Rdata")
+
+summary(immune2.gluc.noot)
+summary(immune2.cfu)
+```
+
+Load in the new data that has been created
+
+```{r}
+#Glucose
+load("chpt3/Rdata/immune2.gluc.Rdata")
+#THC
+load("chpt3/Rdata/immune2.thc.Rdata")
+#CFU
+load("chpt3/Rdata/immune2.cfu.Rdata")
+```
+
+
+## New data
+
+## PLot
+
+### Change in blood glucose
+
+During an immune response circulating blood glucose is readily utilised for celluar energy and will deacrease wit time.
+
+```{r}
+#position=position_dodge(width=1)
+load("chpt3/Rdata/immune2.gluc.Rdata")
+glucose.bc.plot2 <-
+  immune2.gluc %>%
+  dplyr::select(time, treatment, gluc_conc) %>%
+  group_by(time, treatment) %>%
+  dplyr::summarise_each(funs(mean,sd,se=sd(.)/sqrt(n()))) %>%
+  ggplot(aes(x=time, y=mean, colour = treatment)) + 
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.1, position=position_dodge(width=1)) +
+  geom_point(, position=position_dodge(width=1)) +
+  geom_line(, position=position_dodge(width=1)) +
+  scale_y_continuous(limits=c(0,70), breaks=seq(0,70, by = 10)) +
+  scale_x_continuous(breaks=seq(0,30, by = 30)) +
+  theme_bw() +
+  theme(legend.position = "right") +
+  labs( x = "Time in minutes",
+        y = expression(paste("Glucose concentration ", mu,g,"/",mL)))
+
+glucose.bc.plot2
+#ggplotly(glucose.bc.plot)
+
+
+```
+
+### Total Hemocyte count
+
+Hemocytes are like little white blood cells and form part of the abalones innate immune response
+
+```{r}
+#position=position_dodge(width=1)
+load("chpt3/Rdata/immune2.thc.Rdata")
+thc.bc <- immune2.thc.noot
+save(thc.bc, file = "cache/thc.bc.Rdata")
+load("cache/thc.bc.Rdata")
+pt.hc.se.noot<-summarySE(immune2.thc.noot, measurevar="hc", groupvars=c("treatment", "time"), na.rm = TRUE)
+thc.bc.plot<- 
+  immune2.thc.noot %>%
+  dplyr::select(time, treatment, hc) %>%
+  group_by(time, treatment) %>%
+  dplyr::summarise_each(funs(mean,sd,se=sd(.)/sqrt(n()))) 
+%>%
+  ggplot(aes(x=time, y=mean, colour = treatment)) + 
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.1, position=position_dodge(width=1)) +
+  geom_point(position=position_dodge(width=1)) +
+  geom_line(position=position_dodge(width=1)) +
+  #scale_y_continuous(limits=c(1,1e9), breaks=seq(1,1e9, by = 1e1)) +
+  #scale_x_continuous(breaks=seq(0,30, by = 30)) +
+  theme_bw() +
+  theme(legend.position = "right") +
+  labs( x = "Time in minutes",
+        y = "Total hemocyte count")
+#ggplotly(thc.bc.plot)
+thc.bc.plot
+
+
+source("http://goo.gl/UUyEzD")
+
+
+```
+
+Figure \@ref(fig:xx) shows the individual animal difference in hemocyte counts. Ulva fed animals are labeld "F" and Abfeed fed are "E".
+
+```{r xx, echo=FALSE}
+# to see how each individual animal performed
+xx <-  
+  immune2.thc %>%
+  dplyr::select(animal, time, treatment, hc) %>%
+  ggplot(aes(x=time, y=hc, colour = animal)) + 
+  geom_point(aes(colour = animal), position=position_dodge(width=1)) +
+  geom_line(aes(colour = animal), position=position_dodge(width=1)) +
+  #scale_y_continuous(limits=c(1,1e9), breaks=seq(1,1e9, by = 1e1)) +
+  #scale_x_continuous(breaks=seq(0,30, by = 30)) +
+  theme_bw() +
+  theme(legend.position = "right") +
+  labs( x = "Time in minutes",
+        y = "Total hemocyte count")
+#ggplotly(xx)
+xx
+```
+
+### Culture forming Units
+
+```{r}
+#position=position_dodge(width=1)
+load("chpt3/Rdata/immune2.cfu.Rdata")
+cfu.bc.plot <-
+  immune2.cfu.noot %>%
+  dplyr::select(time, treatment, cfu) %>%
+  group_by(time, treatment) %>%
+  dplyr::summarise_each(funs(mean,sd,se=sd(.)/sqrt(n()))) %>%
+  ggplot(aes(x=treatment, y=mean, fill = treatment)) + 
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.1) +
+  geom_bar(stat = "identity") +
+  #scale_y_continuous(limits=c(0,8000), breaks=seq(0,8000, by = 2000)) +
+  #scale_x_continuous(breaks=seq(0,30, by = 30)) +
+  theme_bw() +
+  theme(legend.position = "right") +
+  labs( x = "Time in minutes",
+        y = "Culture forming units (CFU)")
+cfu.bc.plot
+
+
+
+```
+
+## Statistics
+
+Things to test:
+
+1) Is there a difference from time 0 to time 30 in each variable withing treatments
+2) Is there a difference from time 0 to time 30 in each variable between treatments
+3) Correlation 
+
+I am going to prepare new data sets for the statistics and not dirty the ones I am using for plotting.
+
+```{r}
+# Glucose only data set
+load("data/immune1.Rdata")
+immune2.gluc.noot.stat <- 
+  immune1 %>%
+  dplyr::select(animal, treatment, time, gluc_conc) %>%
+  mutate(treatment = as.factor(treatment)) %>%
+  mutate(time = as.factor(time)) %>%
+  group_by(time, treatment) %>%
+  #filter(!(abs(gluc_conc - mean(gluc_conc)) > 2.5*sd(gluc_conc)))%>%
+  filter(- gluc_conc <= 0) %>%
+  spread(key = time, value = gluc_conc)
+# rename the coloum
+names(immune2.gluc.noot.stat)[3:4] <- c('initial', 'final')
+#save(immune2.gluc.stat, file = "chpt3/Rdata/immune2.gluc.stat.Rdata")
+# Drop NAs and create change for correlation
+immune2.gluc.stat2 <- 
+  immune2.gluc.noot.stat %>%
+  drop_na(initial) %>%
+  drop_na(final) %>%
+  mutate(delta_gluc = (initial - final)/initial *100) 
+
+# THC counts only
+immune2.thc.stat<- 
+  immune1 %>%
+  drop_na(hc) %>%
+  dplyr::select(animal, treatment, time, hc) %>%
+  mutate(treatment = as.factor(treatment)) %>%
+  mutate(time = as.factor(time)) %>%
+  group_by(time, treatment) %>%
+  filter(!(abs(hc - mean(hc)) > 2.5*sd(hc))) %>%
+  spread(key = time, value = hc)
+# rename the coloum
+names(immune2.thc.stat)[3:4] <- c('initial', 'final')
+save(immune2.thc.stat, file = "index/chpt3/Rdata/immune2.thc.stat.Rdata")
+
+# Drop NAs and create change for correlation
+immune2.thc.stat2 <- 
+  immune2.thc.stat %>%
+  drop_na(initial) %>%
+  drop_na(final) %>%
+  mutate(delta_thc = (initial - final)/initial *100) 
+
+#immune2.thc.stat2 %>%
+#dplyr::summarise(delta_thc_mean = mean(delta_thc),
+#                   delta_thc_sd = sd(delta_thc))
+
+# CFU only
+immune2.cfu.stat<- 
+  immune1 %>%
+  drop_na(cfu) %>%
+  dplyr::select(animal, treatment, time, cfu) %>%
+  mutate(treatment = as.factor(treatment)) %>%
+  group_by(time, treatment) %>%
+  filter(!(abs(cfu - mean(cfu)) > 2.5*sd(cfu)))
+save(immune2.cfu.stat, file = "chpt3/Rdata/immune2.cfu.stat.Rdata")
+
+```
+
+Load in the new data that has been created for statistics
+
+```{r}
+#Glucose
+load("chpt3/Rdata/immune2.gluc.stat.Rdata")
+#THC
+load("chpt3/Rdata/immune2.thc.stat.Rdata")
+#CFU
+load("chpt3/Rdata/immune2.cfu.stat.Rdata")
+```
+
+### Glucose concentrations
+
+The first comparison will be done using t.test on the initial and final glucose concentrations between groups. Significance is set at 0.05
+
+```{r}
+# Difference between groups at initial
+tidy(t.test(initial ~ treatment, data = immune2.gluc.noot.stat))
+
+# Difference between groups at final 
+tidy(t.test(final ~ treatment, data = immune2.gluc.noot.stat))
+
+```
+
+The second comparison will be done using t.test on the initial and final glucose concentrations within groups. Significance is set at 0.05
+
+```{r}
+# Difference within Abfeed group at initial and final
+immune2.gluc.noot.stat %>%
+  dplyr::select(animal, treatment, initial, final) %>%
+  gather("time", "gluc_conc", 3,4) %>%
+  mutate(time = as.factor(time)) %>%
+  filter(treatment == "Abfeed") %>%
+  do(tidy(t.test(gluc_conc ~ time, data = .)))
+
+# Difference within Ulva group at initial and final
+immune2.gluc.noot.stat %>%
+  dplyr::select(animal, treatment, initial, final) %>%
+  gather("time", "gluc_conc", 3,4) %>%
+  mutate(time = as.factor(time)) %>%
+  filter(treatment == "Ulva") %>%
+  do(tidy(t.test(gluc_conc ~ time, data = .)))
+
+```
+
+### Total hemocyte counts
+
+The first comparison will be done using t.test on the initial and final glucose concentrations between groups. Significance is set at 0.05
+
+```{r}
+#THC
+load("chpt3/Rdata/immune2.thc.stat.Rdata")
+# Difference between groups at initial = significant
+tidy(t.test(initial ~ treatment, data = immune2.thc.stat))
+# No significance p=0.5290768
+# Difference between groups at final = significant
+tidy(t.test(final ~ treatment, data = immune2.thc.stat))
+# No significance p=0.9691169
+```
+
+The second comparison will be done using t.test on the initial and final THC counts within groups. Significance is set at 0.05
+
+```{r}
+#THC
+load("chpt3/Rdata/immune2.thc.stat.Rdata")
+# Difference within Abfeed group at initial and final
+immune2.thc.stat %>%
+  dplyr::select(animal, treatment, initial, final) %>%
+  gather("time", "thc", 3,4) %>%
+  mutate(time = as.factor(time)) %>%
+  filter(treatment == "Abfeed") %>%
+  do(tidy(t.test(thc ~ time, data = .)))
+# NO SIGNIFICANCE p=0.2578334
+
+# Difference within Ulva group at initial and final
+immune2.thc.stat %>%
+  dplyr::select(animal, treatment, initial, final) %>%
+  gather("time", "thc", 3,4) %>%
+  mutate(time = as.factor(time)) %>%
+  filter(treatment == "Ulva")%>%
+  do(tidy(t.test(thc ~ time, data = .)))
+# SIGNIFICANCE
+```
+
+### Bacterial count
+
+The first comparison will be done using t.test on the initial and final glucose concentrations between groups. Significance is set at 0.05
+
+```{r}
+# Difference between groups at initial = significant
+tidy(t.test(cfu ~ treatment, data = immune2.cfu.stat))
+# No significance
+```
+
+Hclust attempt
+
+```{r, eval=FALSE, include=FALSE}
+needs(stats)
+# Only looking at the change 
+A <- immune2.gluc.stat2 %>%
+  ungroup(treatment) %>%
+  dplyr::select(-treatment, -initial, -final)
+
+B <- immune2.thc.stat2 %>%
+  ungroup(treatment) %>%
+  dplyr::select(-treatment, -initial, -final)
+
+x <- inner_join(A, B, by = "animal") 
+
+modelname<-hclust(dist(x))
+
+plot(modelname, labels=x$animal)
+rect.hclust(modelname, 4)
+plot(modelname)
+
+#using initial counts and conc
+C <- immune2.gluc.stat2 %>%
+  ungroup(treatment) %>%
+  dplyr::select(-treatment, -final)
+
+D <- immune2.thc.stat2 %>%
+  ungroup(treatment) %>%
+  dplyr::select(-treatment, -final)
+
+y <- inner_join(C, D, by = "animal") 
+
+modelname<-hclust(dist(y))
+
+plot(modelname, labels=y$animal)
+rect.hclust(modelname, 4)
+plot(modelname)
+
+#using initial counts and conc
+E <- immune2.gluc.stat2 %>%
+  ungroup(treatment) %>%
+  dplyr::select(-treatment)
+
+F <- immune2.thc.stat2 %>%
+  ungroup(treatment) %>%
+  dplyr::select(-treatment)
+
+z <- inner_join(E, F, by = "animal") 
+
+modelname<-hclust(dist(z))
+
+plot(modelname, labels=z$animal)
+rect.hclust(modelname, 4)
+plot(modelname)
+
+```
+
+

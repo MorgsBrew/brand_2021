@@ -1,0 +1,36 @@
+---
+title: "Setup"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(workflowr)
+library(GGally)
+library(superheat)
+library(viridis)
+library(factoextra)
+library(ggalt)
+library(ggfortify)
+#library(ggbiplot)
+library(ggpubr)
+library(RColorBrewer)
+library(vegan)
+library(gplots)
+library(ggeffects)
+library(Rmisc)
+library(gridExtra)
+library(FSA)
+library(rcompanion)
+library(PMCMR)
+library(table1)
+library(tidyr)
+library(broom)
+library(officer)
+library(magrittr)
+library(dplyr)
+library(car)
+library(FactoMineR)
+library(indicspecies)
+library(workflowr)
+```
