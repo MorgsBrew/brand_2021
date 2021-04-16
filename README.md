@@ -1,4 +1,5 @@
 # An abalone slimey GIT and Ulvas' X
+[![DOI](https://zenodo.org/badge/347879379.svg)](https://zenodo.org/badge/latestdoi/347879379)
 
 This thesis has been written in Microsoft Word 2016 (Mac) while all the analysis and visualizations have been done in R. RStudio has been a critical component of this Thesis and is the core component of moving toward reproducible research. Unfortunately, the lack of a formalized workflow with dedicated channels for collaborative input leaves the reproducibility of this system in an unreproducible state. At the onset, a solid workflow for data capture, analysis, processing and collaboration should be outlined that will significantly improve the overall process of compiling a thesis.
 
